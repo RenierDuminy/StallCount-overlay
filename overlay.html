@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StallCount Overlay</title>
+    <link rel="stylesheet" href="/src/theme.css" />
+    <link rel="stylesheet" href="/src/overlay.css" />
+  </head>
+  <body>
+    <!-- Customize this markup and styling for your stream overlay -->
+    <div class="overlay-root">
+      <div class="overlay-bar">
+        <div class="overlay-logo">
+          <img id="eventLogo" alt="Event logo" />
+          <span class="overlay-logo-fallback" id="eventLogoFallback">SC</span>
+        </div>
+
+        <div class="overlay-team overlay-team--home">
+          <div class="team-identity">
+            <span class="team-seed" id="teamASeed"></span>
+            <img class="team-flag" id="teamAFlag" alt="" />
+            <span class="team-name" id="teamAName">Team A</span>
+          </div>
+          <span class="team-score" id="scoreA">0</span>
+        </div>
+
+        <div class="overlay-team overlay-team--away">
+          <div class="team-identity">
+            <span class="team-seed" id="teamBSeed"></span>
+            <img class="team-flag" id="teamBFlag" alt="" />
+            <span class="team-name" id="teamBName">Team B</span>
+          </div>
+        </div>
+
+        <div class="overlay-scoreboard">
+          <span class="team-score team-score--away" id="scoreB">0</span>
+          <span class="divider"></span>
+          <span class="period-label" id="periodLabel">1ST</span>
+          <span class="divider"></span>
+          <span class="match-time" id="matchTime">--:--</span>
+        </div>
+      </div>
+
+      <div class="overlay-event" id="eventName">Event Name</div>
+      <div class="meta" id="meta">Loading...</div>
+    </div>
+    <script type="module" src="/src/overlay.js"></script>
+  </body>
+</html>
