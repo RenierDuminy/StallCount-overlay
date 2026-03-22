@@ -217,7 +217,15 @@ function formatTimedButtonLabel(label, seconds) {
   return `${label} (${seconds}s)`;
 }
 
-function buildOverlayUrl({ overlayFile, matchId, teamATheme, teamBTheme, manualOverrides, breakChanceEnabled }) {
+function buildOverlayUrl({
+  overlayFile,
+  matchId,
+  teamATheme,
+  teamBTheme,
+  manualOverrides,
+  breakChanceEnabled,
+  isInitialized,
+}) {
   if (!overlayFile) return "";
   const trimmed = overlayFile.trim();
   if (!trimmed) return "";
@@ -254,6 +262,11 @@ function buildOverlayUrl({ overlayFile, matchId, teamATheme, teamBTheme, manualO
     url.searchParams.set("breakChance", "0");
   } else {
     url.searchParams.delete("breakChance");
+  }
+  if (isInitialized) {
+    url.searchParams.set("initialized", "1");
+  } else {
+    url.searchParams.delete("initialized");
   }
 
   return url.toString();
@@ -315,6 +328,7 @@ export default function App() {
               scoreB: manualScoreB,
             },
             breakChanceEnabled,
+            isInitialized,
           })
         : "",
     [
@@ -328,6 +342,7 @@ export default function App() {
       manualScoreA,
       manualScoreB,
       breakChanceEnabled,
+      isInitialized,
     ],
   );
   const overlayPreviewUrl = useMemo(() => {
@@ -1531,7 +1546,6 @@ export default function App() {
                           {renderAutoFadeToggle(matchStatsAutoFade, setMatchStatsAutoFade)}
                         </div>
                         <div className="overlay-matchstats-table">
-                          <div className="overlay-matchstats-table__title">Match stats</div>
                           <table className="overlay-matchstats-table__grid">
                             <thead>
                               <tr>

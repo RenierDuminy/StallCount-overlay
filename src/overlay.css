@@ -87,7 +87,7 @@ body.overlay-fixed .overlay-event {
 .overlay-bar {
   width: 100%;
   display: grid;
-  grid-template-columns: 90px minmax(0, 1.35fr) minmax(0, 1.35fr) 110px 130px;
+  grid-template-columns: 90px minmax(0, 1.35fr) minmax(0, 1.35fr) 110px 170px;
   align-items: stretch;
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -97,32 +97,29 @@ body.overlay-fixed .overlay-event {
   z-index: 2;
 }
 
-.overlay-break-chance {
+.overlay-break-chance,
+.overlay-timeout {
   position: absolute;
-  left: 50%;
+  left: 0;
+  right: 0;
   bottom: 100%;
-  transform: translate(-50%, -6px);
-  padding: 4px 8px;
-  border-radius: 0;
-  background: #b91c1c;
+  transform: translateY(0);
+  padding: 8px 12px;
+  background: #991b1b;
   color: #ffffff;
-  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   text-align: center;
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.25);
+  border-radius: 10px 10px 0 0;
+  box-shadow: 0 10px 24px rgba(153, 27, 27, 0.35);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 160ms ease, transform 160ms ease;
   z-index: 3;
-  white-space: nowrap;
 }
 
 .overlay-break-chance.is-active {
   opacity: 1;
-  transform: translate(-50%, -2px);
 }
 
 .overlay-logo {
@@ -241,6 +238,24 @@ body.overlay-fixed .overlay-event {
   white-space: nowrap;
 }
 
+.status-label.is-pull {
+  display: block;
+  width: 100%;
+  text-align: center;
+  white-space: pre-line;
+  text-transform: none;
+  line-height: 1.02;
+  letter-spacing: 0.12em;
+}
+
+.status-label.is-stacked {
+  display: block;
+  width: 100%;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.02;
+}
+
 .overlay-clock {
   background: #ffffff;
 }
@@ -275,37 +290,8 @@ body.overlay-fixed .overlay-event {
   z-index: 2;
 }
 
-.overlay-timeout {
-  position: absolute;
-  top: 0;
-  transform: translateY(-100%);
-  padding: 6px 16px;
-  background: #991b1b;
-  color: #ffffff;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  border-radius: 0 0 10px 10px;
-  box-shadow: 0 10px 24px rgba(153, 27, 27, 0.35);
-  opacity: 0;
-  pointer-events: none;
-  z-index: 3;
-}
-
-.overlay-timeout--team-a {
-  left: 90px;
-  width: calc(50% - 90px);
-  text-align: left;
-}
-
-.overlay-timeout--team-b {
-  right: 0;
-  width: calc(50% - 65px);
-  text-align: right;
-}
-
 .overlay-timeout.is-active {
-  animation: timeout-drop 4s ease-in-out forwards;
+  animation: timeout-fade 4s ease-in-out forwards;
 }
 
 .overlay-timeout.is-persistent {
@@ -332,6 +318,12 @@ body.overlay-fixed .overlay-event {
   animation: match-event-drop 4.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
+.overlay-match-event-banner.is-active.is-stoppage {
+  animation: none;
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
 .overlay-match-event-banner.is-persistent {
   opacity: 1;
   transform: translate(-50%, 0);
@@ -348,7 +340,7 @@ body.overlay-fixed .overlay-event {
 
 .timeout-label {
   display: block;
-  font-size: 14px;
+  font-size: 10px;
 }
 
 .overlay-banner {
@@ -425,12 +417,12 @@ body.overlay-fixed .overlay-event {
   text-transform: uppercase;
   background: #0f172a;
   color: #ffffff;
-  font-size: 1.14rem;
+  font-size: 1.43rem;
 }
 
 .matchstats-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 144px minmax(0, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: stretch;
   background: #ffffff;
 }
@@ -468,8 +460,8 @@ body.overlay-fixed .overlay-event {
   padding: 0.45rem 0.8rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 1.14rem;
+  letter-spacing: 0.15em;
+  font-size: 1.43rem;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -480,7 +472,7 @@ body.overlay-fixed .overlay-event {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.14rem;
+  font-size: 1.75rem;
   font-weight: 700;
   text-align: center;
 }
@@ -490,7 +482,7 @@ body.overlay-fixed .overlay-event {
   align-items: center;
   justify-content: center;
   padding: 0 0.4rem;
-  font-size: 1.14rem;
+  font-size: 1.43rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: #000000;
@@ -524,7 +516,7 @@ body.overlay-fixed .overlay-event {
 }
 
 .banner-name {
-  font-size: 20px;
+  font-size: 25px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -556,7 +548,7 @@ body.overlay-fixed .overlay-event {
 }
 
 .banner-stat__label {
-  font-size: 11px;
+  font-size: 14px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--banner-surface-muted);
@@ -564,7 +556,7 @@ body.overlay-fixed .overlay-event {
 }
 
 .banner-stat__value {
-  font-size: 18px;
+  font-size: 23px;
   font-weight: 700;
 }
 
@@ -593,22 +585,18 @@ body.overlay-fixed .overlay-event {
   }
 }
 
-@keyframes timeout-drop {
+@keyframes timeout-fade {
   0% {
     opacity: 0;
-    transform: translateY(-100%);
   }
   20% {
     opacity: 1;
-    transform: translateY(0);
   }
   80% {
     opacity: 1;
-    transform: translateY(0);
   }
   100% {
     opacity: 0;
-    transform: translateY(-100%);
   }
 }
 

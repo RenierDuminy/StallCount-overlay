@@ -8,6 +8,7 @@ const MATCH_FIELDS = `
   score_a,
   score_b,
   start_time,
+  starting_team_id,
   event:events!matches_event_id_fkey (id, name, rules),
   team_a:teams!matches_team_a_fkey (id, name, short_name, attributes),
   team_b:teams!matches_team_b_fkey (id, name, short_name, attributes)
@@ -15,6 +16,7 @@ const MATCH_FIELDS = `
 
 const DEFAULT_LOGO_SRC = `${import.meta.env.BASE_URL}stallcount-logo.png`;
 const EVENT_FIELDS = "id, name, rules";
+const APP_SETTINGS_STORAGE_KEY = "stallcount:overlay-control-settings";
 const MATCH_LOG_FIELDS = `
   id,
   match_id,
@@ -83,7 +85,8 @@ const matchId = (searchParams.get("matchId") || "").trim();
 const teamATheme = (searchParams.get("teamATheme") || "primary").trim().toLowerCase();
 const teamBTheme = (searchParams.get("teamBTheme") || "primary").trim().toLowerCase();
 const manualOverrides = getManualOverrides(searchParams);
-const breakChanceEnabled = getBreakChanceEnabled(searchParams);
+let breakChanceEnabled = true;
+let overlayInitialized = false;
 const isPreview =
   ["1", "true", "yes"].includes((searchParams.get("preview") || "").trim().toLowerCase());
 
@@ -148,6 +151,39 @@ function formatTeamName(team) {
   if (!team) return "TBD";
   return team.name || "TBD";
 }
+
+function readPersistedAppSettings() {
+  try {
+    const raw = window.localStorage.getItem(APP_SETTINGS_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function getOverlayInitialized() {
+  const queryValue = (searchParams.get("initialized") || "").trim().toLowerCase();
+  if (["1", "true", "yes"].includes(queryValue)) return true;
+  const persistedSettings = readPersistedAppSettings();
+  const persistedMatchId = (persistedSettings.matchId || "").toString().trim();
+  if (matchId && persistedMatchId && persistedMatchId !== matchId) {
+    return false;
+  }
+  return persistedSettings.isInitialized === true;
+}
+
+function formatTeamShortName(team) {
+  if (!team) return "TBD";
+  const shortName = (team.short_name || "").toString().trim();
+  if (shortName) return shortName;
+  const name = (team.name || "").toString().trim();
+  return name || "TBD";
+}
+
+overlayInitialized = getOverlayInitialized();
+breakChanceEnabled = getBreakChanceEnabled(searchParams);
 
 function normalizeAttributes(attributes) {
   if (!attributes) return null;
@@ -346,7 +382,10 @@ function getManualOverrides(params) {
 
 function getBreakChanceEnabled(params) {
   const value = (params.get("breakChance") || "").trim().toLowerCase();
-  if (!value) return true;
+  if (!value) {
+    const persistedValue = readPersistedAppSettings().breakChanceEnabled;
+    return typeof persistedValue === "boolean" ? persistedValue : true;
+  }
   return !["0", "false", "no", "off"].includes(value);
 }
 
@@ -550,7 +589,12 @@ function getDerivedClockInfo() {
   });
 
   if (!matchStartMs) {
-    return { clockText: "", secondsRemaining: null, hasStarted: false, isPaused: false };
+    return {
+      clockText: overlayInitialized ? formatSeconds(timeCapSeconds) : "",
+      secondsRemaining: overlayInitialized ? timeCapSeconds : null,
+      hasStarted: false,
+      isPaused: false,
+    };
   }
 
   const now = Date.now();
@@ -597,7 +641,7 @@ function getMatchPhaseFromLogs() {
   return "starting";
 }
 
-function deriveStatusLabel({ clockSeconds } = {}) {
+function deriveStatusLabel({ match, clockSeconds, status, overlayInitialized } = {}) {
   const phase = getMatchPhaseFromLogs();
   if (phase === "final") return "FINAL";
   if (Number.isFinite(clockSeconds) && clockSeconds <= 0) return "SOFT CAP";
@@ -606,7 +650,22 @@ function deriveStatusLabel({ clockSeconds } = {}) {
     return "2ND HALF";
   }
   if (phase === "first") return "1ST HALF";
-  return "STARTING SOON";
+  const normalizedStatus = (status || "").toString().trim().toLowerCase();
+  if (!overlayInitialized && (!normalizedStatus || normalizedStatus === "scheduled")) {
+    return "STARTING SOON";
+  }
+  if (overlayInitialized && phase === "starting") {
+    const pullingTeam =
+      match?.starting_team_id && match?.starting_team_id === match?.team_a?.id
+        ? match.team_a
+        : match?.starting_team_id && match?.starting_team_id === match?.team_b?.id
+          ? match.team_b
+          : null;
+    if (pullingTeam) {
+      return `Pull:\n${formatTeamShortName(pullingTeam)}`;
+    }
+  }
+  return "";
 }
 
 function refreshClockInterval(clockInfo) {
@@ -842,18 +901,25 @@ function updateOverlay(match, scoreboard) {
     : Number.isFinite(scoreboard?.scoreB)
       ? scoreboard.scoreB
       : match.score_b;
-  const derivedStatusLabel = deriveStatusLabel({ clockSeconds: clockInfo.secondsRemaining });
   const status = scoreboard?.status || match.status;
+  const normalizedStatus = (status || "").toString().trim().toLowerCase();
+  const derivedStatusLabel = deriveStatusLabel({
+    match,
+    clockSeconds: clockInfo.secondsRemaining,
+    status,
+    overlayInitialized,
+  });
   const fallbackStatusLabel =
     formatStatusLabel({ period: scoreboard?.period, half: scoreboard?.half, status }) ||
-    STATUS_LABELS[(status || "").toString().toLowerCase()] ||
+    (normalizedStatus === "scheduled" ? (overlayInitialized ? "SCHEDULED" : "STARTING SOON") : "") ||
+    STATUS_LABELS[normalizedStatus] ||
     (status ? status.toString().toUpperCase() : "LIVE");
   const statusLabel =
     (manualOverrides?.enabled && manualOverrides.statusLabel) ||
     derivedStatusLabel ||
     fallbackStatusLabel;
   const manualClockValue = manualOverrides?.enabled ? manualOverrides.clock : "";
-  const hideClock = statusLabel === "STARTING SOON" && !manualClockValue;
+  const hideClock = !overlayInitialized && statusLabel === "STARTING SOON" && !manualClockValue;
   const derivedClock = clockInfo.clockText || "";
   const matchClock =
     manualClockValue ||
@@ -863,7 +929,15 @@ function updateOverlay(match, scoreboard) {
 
   if (elements.eventName) elements.eventName.textContent = eventName;
   if (elements.logoFallback) elements.logoFallback.textContent = getInitials(eventName);
-  if (elements.statusLabel) elements.statusLabel.textContent = statusLabel || "LIVE";
+  if (elements.statusLabel) {
+    const resolvedStatusLabel = statusLabel || "LIVE";
+    elements.statusLabel.textContent = resolvedStatusLabel;
+    elements.statusLabel.classList.toggle("is-pull", resolvedStatusLabel.startsWith("Pull:\n"));
+    elements.statusLabel.classList.toggle(
+      "is-stacked",
+      resolvedStatusLabel === "1ST HALF" || resolvedStatusLabel === "2ND HALF",
+    );
+  }
   if (elements.matchClock) elements.matchClock.textContent = matchClock;
   if (elements.matchClock?.parentElement) {
     elements.matchClock.parentElement.classList.toggle("is-hidden", hideClock);
@@ -1098,25 +1172,37 @@ function getMatchEventLabel(payload) {
   return "MATCH EVENT";
 }
 
+function isStoppagePayload(payload) {
+  const rawCode = (payload?.eventCode || "").toString().trim().toLowerCase();
+  const rawDescription = (payload?.eventDescription || "").toString().trim().toLowerCase();
+  return rawCode === MATCH_LOG_EVENT_CODES.STOPPAGE_START || rawDescription.includes("stoppage");
+}
+
+function hideMatchEventBanner() {
+  elements.matchEventBanner?.classList.remove("is-active");
+  elements.matchEventBanner?.classList.remove("is-persistent");
+  elements.matchEventBanner?.classList.remove("is-stoppage");
+  activeMatchEventKey = null;
+  if (matchEventTimeout) {
+    window.clearTimeout(matchEventTimeout);
+    matchEventTimeout = null;
+  }
+}
+
 function showMatchEventBanner(payload) {
   if (!elements.matchEventBanner || !elements.matchEventBannerLabel) return;
   const payloadKey = getOverlayPayloadKey(payload);
   const autoFade = isAutoFadeEnabled(payload);
 
   if (!autoFade && activeMatchEventKey === payloadKey && elements.matchEventBanner.classList.contains("is-active")) {
-    elements.matchEventBanner.classList.remove("is-active");
-    elements.matchEventBanner.classList.remove("is-persistent");
-    activeMatchEventKey = null;
-    if (matchEventTimeout) {
-      window.clearTimeout(matchEventTimeout);
-      matchEventTimeout = null;
-    }
+    hideMatchEventBanner();
     return;
   }
 
   elements.matchEventBannerLabel.textContent = getMatchEventLabel(payload);
   elements.matchEventBanner.classList.remove("is-active");
   elements.matchEventBanner.classList.remove("is-persistent");
+  elements.matchEventBanner.classList.toggle("is-stoppage", isStoppagePayload(payload));
   void elements.matchEventBanner.offsetWidth;
   elements.matchEventBanner.classList.add("is-active");
   activeMatchEventKey = payloadKey;
@@ -1127,13 +1213,40 @@ function showMatchEventBanner(payload) {
   }
   if (autoFade) {
     matchEventTimeout = window.setTimeout(() => {
-      elements.matchEventBanner?.classList.remove("is-active");
-      elements.matchEventBanner?.classList.remove("is-persistent");
-      activeMatchEventKey = null;
-      matchEventTimeout = null;
+      hideMatchEventBanner();
     }, 4600);
   } else {
     elements.matchEventBanner.classList.add("is-persistent");
+  }
+}
+
+function isStoppageActive() {
+  let active = false;
+  getMatchLogTimeline().forEach((log) => {
+    const eventType = log?.eventType || matchEventTypes.get(log?.event_type_id);
+    const eventCode = resolveEventCode(eventType);
+    if (eventCode === MATCH_LOG_EVENT_CODES.STOPPAGE_START) {
+      active = true;
+    }
+    if (eventCode === MATCH_LOG_EVENT_CODES.STOPPAGE_END) {
+      active = false;
+    }
+  });
+  return active;
+}
+
+function syncStoppageBanner() {
+  if (isStoppageActive()) {
+    showMatchEventBanner({
+      type: "matchEvent",
+      eventCode: MATCH_LOG_EVENT_CODES.STOPPAGE_START,
+      eventDescription: "Stoppage",
+      autoFade: false,
+    });
+    return;
+  }
+  if (activeMatchEventKey === `matchEvent:${MATCH_LOG_EVENT_CODES.STOPPAGE_START}:`) {
+    hideMatchEventBanner();
   }
 }
 
@@ -1205,6 +1318,7 @@ async function loadScoreboardSnapshot() {
 
 loadScoreboardSnapshot();
 loadMatchLogsSnapshot().then(() => {
+  syncStoppageBanner();
   if (currentMatch) {
     updateOverlay(currentMatch, currentScoreboard);
   }
@@ -1248,6 +1362,7 @@ if (matchId) {
           ...(currentMatch || {}),
           event_id: incoming.event_id ?? currentMatch?.event_id,
           start_time: incoming.start_time ?? currentMatch?.start_time,
+          starting_team_id: incoming.starting_team_id ?? currentMatch?.starting_team_id,
           event: incoming.event ?? currentMatch?.event,
           score_a: incoming.score_a ?? currentMatch?.score_a,
           score_b: incoming.score_b ?? currentMatch?.score_b,
@@ -1311,6 +1426,7 @@ if (matchId) {
       (payload) => {
         if (payload.eventType === "DELETE") {
           removeMatchLog(payload.old?.id);
+          syncStoppageBanner();
           if (currentMatch) {
             updateOverlay(currentMatch, currentScoreboard);
           }
@@ -1332,6 +1448,12 @@ if (matchId) {
             if (teamId === currentMatch.team_b?.id) showTimeoutBanner("B");
           }
         }
+        if (
+          eventCode === MATCH_LOG_EVENT_CODES.STOPPAGE_START ||
+          eventCode === MATCH_LOG_EVENT_CODES.STOPPAGE_END
+        ) {
+          syncStoppageBanner();
+        }
         if (currentMatch) {
           updateOverlay(currentMatch, currentScoreboard);
         }
@@ -1348,6 +1470,14 @@ if (matchId) {
 }
 
 window.addEventListener("storage", (event) => {
+  if (event.key === APP_SETTINGS_STORAGE_KEY) {
+    overlayInitialized = getOverlayInitialized();
+    breakChanceEnabled = getBreakChanceEnabled(searchParams);
+    if (currentMatch) {
+      updateOverlay(currentMatch, currentScoreboard);
+    }
+    return;
+  }
   if (event.key !== "overlayBanner") return;
   if (!event.newValue) return;
   try {
