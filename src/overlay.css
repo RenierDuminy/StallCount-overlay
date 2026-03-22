@@ -308,6 +308,34 @@ body.overlay-fixed .overlay-event {
   animation: timeout-drop 4s ease-in-out forwards;
 }
 
+.overlay-match-event-banner {
+  position: absolute;
+  left: 50%;
+  top: 72px;
+  transform: translate(-50%, -120%);
+  padding: 10px 22px;
+  background: rgba(15, 23, 42, 0.96);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.3);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.overlay-match-event-banner.is-active {
+  animation: match-event-drop 4.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.overlay-match-event-banner__label {
+  display: block;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .timeout-label {
   display: block;
   font-size: 14px;
@@ -580,6 +608,25 @@ body.overlay-fixed .overlay-event {
   100% {
     opacity: 0;
     transform: translateY(-100%);
+  }
+}
+
+@keyframes match-event-drop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -120%);
+  }
+  14% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  82% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -40%);
   }
 }
 

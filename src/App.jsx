@@ -255,6 +255,7 @@ function buildOverlayUrl({ overlayFile, matchId, teamATheme, teamBTheme, manualO
 }
 
 export default function App() {
+  const overlayBannerChannelRef = useMemo(() => ({ current: null }), []);
   const [overlayChoice, setOverlayChoice] = useState(getInitialOverlayChoice());
   const [customOverlay, setCustomOverlay] = useState(getInitialCustomOverlay());
   const [matchId, setMatchId] = useState(getInitialMatchId());
@@ -423,6 +424,24 @@ export default function App() {
     setIsInitialized(false);
   };
 
+  const publishOverlayPayload = async (payload) => {
+    try {
+      window.localStorage.setItem("overlayBanner", JSON.stringify(payload));
+    } catch (error) {
+      // Ignore local storage failures and still try realtime delivery.
+    }
+
+    try {
+      await overlayBannerChannelRef.current?.send({
+        type: "broadcast",
+        event: "overlay-banner",
+        payload,
+      });
+    } catch (error) {
+      // Keep the control surface responsive even if realtime delivery fails.
+    }
+  };
+
   const handleTriggerBanner = async () => {
     if (!trimmedMatchId || !selectedBannerPlayer?.id) return;
 
@@ -461,7 +480,7 @@ export default function App() {
         ts: Date.now(),
       };
 
-      localStorage.setItem("overlayBanner", JSON.stringify(payload));
+      await publishOverlayPayload(payload);
       setBannerStatus(`Banner queued for ${selectedBannerPlayer.name}.`);
       window.setTimeout(() => setBannerStatus(""), 3000);
     } catch (error) {
@@ -470,7 +489,7 @@ export default function App() {
     }
   };
 
-  const handleTriggerMatchStats = () => {
+  const handleTriggerMatchStats = async () => {
     const stats = matchStats || {};
     const payload = {
       type: "matchStats",
@@ -488,7 +507,7 @@ export default function App() {
       ts: Date.now(),
     };
     try {
-      localStorage.setItem("overlayBanner", JSON.stringify(payload));
+      await publishOverlayPayload(payload);
       setBannerStatus("Match stats banner queued.");
       window.setTimeout(() => setBannerStatus(""), 3000);
     } catch (error) {
@@ -497,7 +516,7 @@ export default function App() {
     }
   };
 
-  const handleTriggerTimeout = (team) => {
+  const handleTriggerTimeout = async (team) => {
     if (!team) return;
     const payload = {
       type: "timeout",
@@ -505,7 +524,7 @@ export default function App() {
       ts: Date.now(),
     };
     try {
-      localStorage.setItem("overlayBanner", JSON.stringify(payload));
+      await publishOverlayPayload(payload);
       setBannerStatus(`Timeout banner queued for Team ${team}.`);
       window.setTimeout(() => setBannerStatus(""), 3000);
     } catch (error) {
@@ -514,7 +533,7 @@ export default function App() {
     }
   };
 
-  const handleTriggerMatchEvent = (eventType, team) => {
+  const handleTriggerMatchEvent = async (eventType, team) => {
     if (!eventType?.id) return;
     const payload = {
       type: "matchEvent",
@@ -525,7 +544,7 @@ export default function App() {
       ts: Date.now(),
     };
     try {
-      localStorage.setItem("overlayBanner", JSON.stringify(payload));
+      await publishOverlayPayload(payload);
       setBannerStatus(`Match event queued (${eventType.description || eventType.code || eventType.id}) for Team ${team}.`);
       window.setTimeout(() => setBannerStatus(""), 3000);
     } catch (error) {
@@ -533,6 +552,26 @@ export default function App() {
       window.setTimeout(() => setBannerStatus(""), 3000);
     }
   };
+
+  useEffect(() => {
+    if (overlayBannerChannelRef.current) {
+      supabase.removeChannel(overlayBannerChannelRef.current);
+      overlayBannerChannelRef.current = null;
+    }
+
+    if (!trimmedMatchId) return undefined;
+
+    const channel = supabase.channel(`overlay-banner:${trimmedMatchId}`);
+    overlayBannerChannelRef.current = channel;
+    channel.subscribe();
+
+    return () => {
+      if (overlayBannerChannelRef.current === channel) {
+        overlayBannerChannelRef.current = null;
+      }
+      supabase.removeChannel(channel);
+    };
+  }, [overlayBannerChannelRef, trimmedMatchId]);
 
   useEffect(() => {
     if (!trimmedMatchId && isInitialized) {
@@ -1531,6 +1570,7 @@ export default function App() {
                             type="button"
                             className={`sc-button is-ghost ${bannerEventGroups.halftimeEvent ? "" : "is-disabled"}`}
                             disabled={!bannerEventGroups.halftimeEvent}
+                            onClick={() => handleTriggerMatchEvent(bannerEventGroups.halftimeEvent)}
                           >
                             Halftime
                           </button>

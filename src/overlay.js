@@ -75,6 +75,8 @@ const elements = {
   matchStatsBlocksB: document.getElementById("matchStatsBlocksB"),
   timeoutA: document.getElementById("timeoutBannerA"),
   timeoutB: document.getElementById("timeoutBannerB"),
+  matchEventBanner: document.getElementById("matchEventBanner"),
+  matchEventBannerLabel: document.getElementById("matchEventBannerLabel"),
 };
 
 const searchParams = new URLSearchParams(window.location.search);
@@ -101,6 +103,28 @@ let clockInterval = null;
 let bannerTimeout = null;
 let timeoutTimeout = null;
 let matchStatsTimeout = null;
+let matchEventTimeout = null;
+
+function handleOverlayBannerPayload(payload) {
+  if (payload?.type === "playerStats") {
+    showBanner(payload);
+    return;
+  }
+  if (payload?.type === "matchStats") {
+    showMatchStatsBanner(payload);
+    return;
+  }
+  if (payload?.type === "timeout") {
+    const team = (payload.team || "").toString().trim().toUpperCase();
+    if (team === "A" || team === "B") {
+      showTimeoutBanner(team);
+    }
+    return;
+  }
+  if (payload?.type === "matchEvent") {
+    showMatchEventBanner(payload);
+  }
+}
 
 function formatTeamName(team) {
   if (!team) return "TBD";
@@ -981,6 +1005,35 @@ function showTimeoutBanner(team) {
   }, 4200);
 }
 
+function getMatchEventLabel(payload) {
+  const rawCode = (payload?.eventCode || "").toString().trim().toLowerCase();
+  const rawDescription = (payload?.eventDescription || "").toString().trim();
+  const combined = `${rawCode} ${rawDescription.toLowerCase()}`.trim();
+
+  if (combined.includes("half")) return "HALFTIME";
+  if (combined.includes("stoppage")) return "STOPPAGE";
+  if (combined.includes("timeout")) return "TIMEOUT";
+  if (rawDescription) return rawDescription.toUpperCase();
+  if (rawCode) return rawCode.replace(/_/g, " ").toUpperCase();
+  return "MATCH EVENT";
+}
+
+function showMatchEventBanner(payload) {
+  if (!elements.matchEventBanner || !elements.matchEventBannerLabel) return;
+
+  elements.matchEventBannerLabel.textContent = getMatchEventLabel(payload);
+  elements.matchEventBanner.classList.remove("is-active");
+  void elements.matchEventBanner.offsetWidth;
+  elements.matchEventBanner.classList.add("is-active");
+
+  if (matchEventTimeout) {
+    window.clearTimeout(matchEventTimeout);
+  }
+  matchEventTimeout = window.setTimeout(() => {
+    elements.matchEventBanner?.classList.remove("is-active");
+  }, 4600);
+}
+
 async function loadMatch() {
   if (!matchId) {
     setMeta("Add ?matchId=<id> to the URL.", true);
@@ -1055,6 +1108,13 @@ loadMatchLogsSnapshot().then(() => {
 });
 
 if (matchId) {
+  const overlayBannerChannel = supabase
+    .channel(`overlay-banner:${matchId}`)
+    .on("broadcast", { event: "overlay-banner" }, ({ payload }) => {
+      handleOverlayBannerPayload(payload);
+    })
+    .subscribe();
+
   loadMatchEventTypesOnce().then(() => {
     hydrateStoredMatchLogs();
     if (currentMatch) {
@@ -1177,6 +1237,7 @@ if (matchId) {
     .subscribe();
 
   window.addEventListener("beforeunload", () => {
+    supabase.removeChannel(overlayBannerChannel);
     supabase.removeChannel(channel);
     supabase.removeChannel(scoreboardChannel);
     supabase.removeChannel(matchLogsChannel);
@@ -1188,18 +1249,7 @@ window.addEventListener("storage", (event) => {
   if (!event.newValue) return;
   try {
     const payload = JSON.parse(event.newValue);
-    if (payload?.type === "playerStats") {
-      showBanner(payload);
-    }
-    if (payload?.type === "matchStats") {
-      showMatchStatsBanner(payload);
-    }
-    if (payload?.type === "timeout") {
-      const team = (payload.team || "").toString().trim().toUpperCase();
-      if (team === "A" || team === "B") {
-        showTimeoutBanner(team);
-      }
-    }
+    handleOverlayBannerPayload(payload);
   } catch (error) {
     // ignore malformed payloads
   }
