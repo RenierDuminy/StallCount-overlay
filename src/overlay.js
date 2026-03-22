@@ -63,8 +63,7 @@ const elements = {
   matchStatsColumnB: document.getElementById("matchStatsColumnB"),
   matchStatsTeamA: document.getElementById("matchStatsTeamA"),
   matchStatsTeamB: document.getElementById("matchStatsTeamB"),
-  matchStatsScoreA: document.getElementById("matchStatsScoreA"),
-  matchStatsScoreB: document.getElementById("matchStatsScoreB"),
+  matchStatsScoreline: document.getElementById("matchStatsScoreline"),
   matchStatsHoldsA: document.getElementById("matchStatsHoldsA"),
   matchStatsHoldsB: document.getElementById("matchStatsHoldsB"),
   matchStatsBreaksA: document.getElementById("matchStatsBreaksA"),
@@ -104,6 +103,25 @@ let bannerTimeout = null;
 let timeoutTimeout = null;
 let matchStatsTimeout = null;
 let matchEventTimeout = null;
+let activePlayerStatsKey = null;
+let activeMatchStatsKey = null;
+let activeTimeoutKey = null;
+let activeMatchEventKey = null;
+
+function isAutoFadeEnabled(payload) {
+  return payload?.autoFade !== false;
+}
+
+function getOverlayPayloadKey(payload) {
+  if (!payload?.type) return "";
+  if (payload.type === "playerStats") return `playerStats:${payload.playerId || payload.playerName || ""}`;
+  if (payload.type === "matchStats") return "matchStats";
+  if (payload.type === "timeout") return `timeout:${(payload.team || "").toString().trim().toUpperCase()}`;
+  if (payload.type === "matchEvent") {
+    return `matchEvent:${payload.eventTypeId || payload.eventCode || payload.eventDescription || ""}:${payload.team || ""}`;
+  }
+  return payload.type;
+}
 
 function handleOverlayBannerPayload(payload) {
   if (payload?.type === "playerStats") {
@@ -117,7 +135,7 @@ function handleOverlayBannerPayload(payload) {
   if (payload?.type === "timeout") {
     const team = (payload.team || "").toString().trim().toUpperCase();
     if (team === "A" || team === "B") {
-      showTimeoutBanner(team);
+      showTimeoutBanner(team, payload);
     }
     return;
   }
@@ -879,11 +897,8 @@ function setMatchStatsValue(element, value) {
 function updateMatchStatsHeader({ teamAName, teamBName, scoreA, scoreB, teamAColors, teamBColors }) {
   if (elements.matchStatsTeamA) elements.matchStatsTeamA.textContent = teamAName;
   if (elements.matchStatsTeamB) elements.matchStatsTeamB.textContent = teamBName;
-  if (elements.matchStatsScoreA) {
-    elements.matchStatsScoreA.textContent = Number.isFinite(scoreA) ? scoreA : 0;
-  }
-  if (elements.matchStatsScoreB) {
-    elements.matchStatsScoreB.textContent = Number.isFinite(scoreB) ? scoreB : 0;
+  if (elements.matchStatsScoreline) {
+    elements.matchStatsScoreline.textContent = `${Number.isFinite(scoreA) ? scoreA : 0} - ${Number.isFinite(scoreB) ? scoreB : 0}`;
   }
   applyTeamColors(elements.matchStatsColumnA, teamAColors);
   applyTeamColors(elements.matchStatsColumnB, teamBColors);
@@ -954,6 +969,19 @@ function applyMatchStatsPayload(payload) {
 function showBanner(payload) {
   if (!elements.banner) return;
   if (!payload?.playerName) return;
+  const payloadKey = getOverlayPayloadKey(payload);
+  const autoFade = isAutoFadeEnabled(payload);
+
+  if (!autoFade && activePlayerStatsKey === payloadKey && elements.banner.classList.contains("is-active")) {
+    elements.banner.classList.remove("is-active");
+    elements.banner.classList.remove("is-persistent");
+    activePlayerStatsKey = null;
+    if (bannerTimeout) {
+      window.clearTimeout(bannerTimeout);
+      bannerTimeout = null;
+    }
+    return;
+  }
 
   applyBannerTheme(payload);
 
@@ -963,46 +991,98 @@ function showBanner(payload) {
   applyBannerStats(payload.stats);
 
   elements.banner.classList.remove("is-active");
+  elements.banner.classList.remove("is-persistent");
   void elements.banner.offsetWidth;
   elements.banner.classList.add("is-active");
+  activePlayerStatsKey = payloadKey;
   if (bannerTimeout) {
     window.clearTimeout(bannerTimeout);
+    bannerTimeout = null;
   }
-  bannerTimeout = window.setTimeout(() => {
-    elements.banner?.classList.remove("is-active");
-  }, 6200);
+  if (autoFade) {
+    bannerTimeout = window.setTimeout(() => {
+      elements.banner?.classList.remove("is-active");
+      elements.banner?.classList.remove("is-persistent");
+      activePlayerStatsKey = null;
+      bannerTimeout = null;
+    }, 6200);
+  } else {
+    elements.banner.classList.add("is-persistent");
+  }
 }
 
 function showMatchStatsBanner(payload) {
   if (!elements.matchStatsBanner) return;
+  const payloadKey = getOverlayPayloadKey(payload);
+  const autoFade = isAutoFadeEnabled(payload);
+
+  if (!autoFade && activeMatchStatsKey === payloadKey && elements.matchStatsBanner.classList.contains("is-active")) {
+    elements.matchStatsBanner.classList.remove("is-active");
+    activeMatchStatsKey = null;
+    if (matchStatsTimeout) {
+      window.clearTimeout(matchStatsTimeout);
+      matchStatsTimeout = null;
+    }
+    return;
+  }
+
   applyMatchStatsPayload(payload);
   elements.matchStatsBanner.classList.remove("is-active");
   void elements.matchStatsBanner.offsetWidth;
   elements.matchStatsBanner.classList.add("is-active");
+  activeMatchStatsKey = payloadKey;
 
   if (matchStatsTimeout) {
     window.clearTimeout(matchStatsTimeout);
+    matchStatsTimeout = null;
   }
-  matchStatsTimeout = window.setTimeout(() => {
-    elements.matchStatsBanner?.classList.remove("is-active");
-  }, 8000);
+  if (autoFade) {
+    matchStatsTimeout = window.setTimeout(() => {
+      elements.matchStatsBanner?.classList.remove("is-active");
+      activeMatchStatsKey = null;
+      matchStatsTimeout = null;
+    }, 8000);
+  }
 }
 
-function showTimeoutBanner(team) {
+function showTimeoutBanner(team, payload = null) {
   const target =
     team === "A" ? elements.timeoutA : team === "B" ? elements.timeoutB : null;
   if (!target) return;
+  const payloadKey = getOverlayPayloadKey(payload || { type: "timeout", team });
+  const autoFade = isAutoFadeEnabled(payload);
+
+  if (!autoFade && activeTimeoutKey === payloadKey && target.classList.contains("is-active")) {
+    target.classList.remove("is-active");
+    target.classList.remove("is-persistent");
+    activeTimeoutKey = null;
+    if (timeoutTimeout) {
+      window.clearTimeout(timeoutTimeout);
+      timeoutTimeout = null;
+    }
+    return;
+  }
 
   target.classList.remove("is-active");
+  target.classList.remove("is-persistent");
   void target.offsetWidth;
   target.classList.add("is-active");
+  activeTimeoutKey = payloadKey;
 
   if (timeoutTimeout) {
     window.clearTimeout(timeoutTimeout);
+    timeoutTimeout = null;
   }
-  timeoutTimeout = window.setTimeout(() => {
-    target?.classList.remove("is-active");
-  }, 4200);
+  if (autoFade) {
+    timeoutTimeout = window.setTimeout(() => {
+      target?.classList.remove("is-active");
+      target?.classList.remove("is-persistent");
+      activeTimeoutKey = null;
+      timeoutTimeout = null;
+    }, 4200);
+  } else {
+    target.classList.add("is-persistent");
+  }
 }
 
 function getMatchEventLabel(payload) {
@@ -1020,18 +1100,41 @@ function getMatchEventLabel(payload) {
 
 function showMatchEventBanner(payload) {
   if (!elements.matchEventBanner || !elements.matchEventBannerLabel) return;
+  const payloadKey = getOverlayPayloadKey(payload);
+  const autoFade = isAutoFadeEnabled(payload);
+
+  if (!autoFade && activeMatchEventKey === payloadKey && elements.matchEventBanner.classList.contains("is-active")) {
+    elements.matchEventBanner.classList.remove("is-active");
+    elements.matchEventBanner.classList.remove("is-persistent");
+    activeMatchEventKey = null;
+    if (matchEventTimeout) {
+      window.clearTimeout(matchEventTimeout);
+      matchEventTimeout = null;
+    }
+    return;
+  }
 
   elements.matchEventBannerLabel.textContent = getMatchEventLabel(payload);
   elements.matchEventBanner.classList.remove("is-active");
+  elements.matchEventBanner.classList.remove("is-persistent");
   void elements.matchEventBanner.offsetWidth;
   elements.matchEventBanner.classList.add("is-active");
+  activeMatchEventKey = payloadKey;
 
   if (matchEventTimeout) {
     window.clearTimeout(matchEventTimeout);
+    matchEventTimeout = null;
   }
-  matchEventTimeout = window.setTimeout(() => {
-    elements.matchEventBanner?.classList.remove("is-active");
-  }, 4600);
+  if (autoFade) {
+    matchEventTimeout = window.setTimeout(() => {
+      elements.matchEventBanner?.classList.remove("is-active");
+      elements.matchEventBanner?.classList.remove("is-persistent");
+      activeMatchEventKey = null;
+      matchEventTimeout = null;
+    }, 4600);
+  } else {
+    elements.matchEventBanner.classList.add("is-persistent");
+  }
 }
 
 async function loadMatch() {

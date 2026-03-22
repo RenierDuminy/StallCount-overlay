@@ -158,6 +158,11 @@ function getInitialBannerPlayerId() {
   return (readPersistedAppSettings().bannerPlayerId || "").toString().trim();
 }
 
+function getInitialPopupAutoFade(key) {
+  const persistedValue = readPersistedAppSettings()[key];
+  return typeof persistedValue === "boolean" ? persistedValue : true;
+}
+
 function getInitialView() {
   const hash = window.location.hash.replace("#", "").replace("/", "").trim().toLowerCase();
   if (hash === "control") return "control";
@@ -270,6 +275,10 @@ export default function App() {
   const [manualScoreA, setManualScoreA] = useState(getInitialManualScore("manualScoreA"));
   const [manualScoreB, setManualScoreB] = useState(getInitialManualScore("manualScoreB"));
   const [breakChanceEnabled, setBreakChanceEnabled] = useState(getInitialBreakChanceEnabled());
+  const [playerStatsAutoFade, setPlayerStatsAutoFade] = useState(getInitialPopupAutoFade("playerStatsAutoFade"));
+  const [matchStatsAutoFade, setMatchStatsAutoFade] = useState(getInitialPopupAutoFade("matchStatsAutoFade"));
+  const [timeoutAutoFade, setTimeoutAutoFade] = useState(getInitialPopupAutoFade("timeoutAutoFade"));
+  const [matchEventAutoFade, setMatchEventAutoFade] = useState(getInitialPopupAutoFade("matchEventAutoFade"));
   const [bannerPlayerId, setBannerPlayerId] = useState(getInitialBannerPlayerId());
   const [bannerStatus, setBannerStatus] = useState("");
   const [matchEventButtons, setMatchEventButtons] = useState([]);
@@ -404,6 +413,16 @@ export default function App() {
   const overlayOption = OVERLAY_OPTIONS.find((option) => option.value === overlayChoice);
   const overlayDescription = overlayOption?.description;
 
+  const renderAutoFadeToggle = (checked, onChange) => (
+    <label className="overlay-switch">
+      <span className="overlay-switch__label">Auto fade</span>
+      <span className="overlay-switch__control">
+        <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+        <span className="overlay-switch__slider" aria-hidden="true"></span>
+      </span>
+    </label>
+  );
+
   const handleCopy = async () => {
     if (!overlayUrl) return;
     try {
@@ -467,6 +486,7 @@ export default function App() {
 
       const payload = {
         type: "playerStats",
+        autoFade: playerStatsAutoFade,
         playerId: selectedBannerPlayer.id,
         playerName: selectedBannerPlayer.name,
         teamId: resolvedTeamId,
@@ -493,6 +513,7 @@ export default function App() {
     const stats = matchStats || {};
     const payload = {
       type: "matchStats",
+      autoFade: matchStatsAutoFade,
       title: "Match stats",
       stats: {
         holdsA: stats.holdsA ?? "",
@@ -520,6 +541,7 @@ export default function App() {
     if (!team) return;
     const payload = {
       type: "timeout",
+      autoFade: timeoutAutoFade,
       team,
       ts: Date.now(),
     };
@@ -537,6 +559,7 @@ export default function App() {
     if (!eventType?.id) return;
     const payload = {
       type: "matchEvent",
+      autoFade: matchEventAutoFade,
       eventTypeId: eventType.id,
       eventCode: eventType.code,
       eventDescription: eventType.description,
@@ -610,6 +633,10 @@ export default function App() {
       manualScoreA,
       manualScoreB,
       breakChanceEnabled,
+      playerStatsAutoFade,
+      matchStatsAutoFade,
+      timeoutAutoFade,
+      matchEventAutoFade,
       bannerPlayerId,
     };
 
@@ -632,6 +659,10 @@ export default function App() {
     manualScoreA,
     manualScoreB,
     breakChanceEnabled,
+    playerStatsAutoFade,
+    matchStatsAutoFade,
+    timeoutAutoFade,
+    matchEventAutoFade,
     bannerPlayerId,
   ]);
 
@@ -1463,7 +1494,10 @@ export default function App() {
                       </div>
 
                       <div className="overlay-banner-block">
-                        <div className="overlay-banner-block__title">Player stats</div>
+                        <div className="overlay-banner-block__header">
+                          <div className="overlay-banner-block__title">Player stats</div>
+                          {renderAutoFadeToggle(playerStatsAutoFade, setPlayerStatsAutoFade)}
+                        </div>
                         <Field
                           label="Player stats banner"
                           hint="Choose a player to trigger the banner."
@@ -1492,7 +1526,10 @@ export default function App() {
                       </div>
 
                       <div className="overlay-banner-block">
-                        <div className="overlay-banner-block__title">Match stats</div>
+                        <div className="overlay-banner-block__header">
+                          <div className="overlay-banner-block__title">Match stats</div>
+                          {renderAutoFadeToggle(matchStatsAutoFade, setMatchStatsAutoFade)}
+                        </div>
                         <div className="overlay-matchstats-table">
                           <div className="overlay-matchstats-table__title">Match stats</div>
                           <table className="overlay-matchstats-table__grid">
@@ -1538,7 +1575,10 @@ export default function App() {
                       </div>
 
                       <div className="overlay-banner-block">
-                        <div className="overlay-banner-block__title">Timeouts</div>
+                        <div className="overlay-banner-block__header">
+                          <div className="overlay-banner-block__title">Timeouts</div>
+                          {renderAutoFadeToggle(timeoutAutoFade, setTimeoutAutoFade)}
+                        </div>
                         <div className="overlay-banner-actions">
                           <button
                             type="button"
@@ -1564,7 +1604,10 @@ export default function App() {
                       </div>
 
                       <div className="overlay-banner-block">
-                        <div className="overlay-banner-block__title">Halftime + stoppage</div>
+                        <div className="overlay-banner-block__header">
+                          <div className="overlay-banner-block__title">Halftime + stoppage</div>
+                          {renderAutoFadeToggle(matchEventAutoFade, setMatchEventAutoFade)}
+                        </div>
                         <div className="overlay-banner-actions">
                           <button
                             type="button"

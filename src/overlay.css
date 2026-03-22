@@ -308,6 +308,11 @@ body.overlay-fixed .overlay-event {
   animation: timeout-drop 4s ease-in-out forwards;
 }
 
+.overlay-timeout.is-persistent {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .overlay-match-event-banner {
   position: absolute;
   left: 50%;
@@ -327,6 +332,11 @@ body.overlay-fixed .overlay-event {
   animation: match-event-drop 4.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
+.overlay-match-event-banner.is-persistent {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
 .overlay-match-event-banner__label {
   display: block;
   font-size: 22px;
@@ -343,8 +353,8 @@ body.overlay-fixed .overlay-event {
 
 .overlay-banner {
   position: absolute;
-  left: 90px;
-  right: 90px;
+  left: 50%;
+  width: 75%;
   bottom: 132px;
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
@@ -353,7 +363,7 @@ body.overlay-fixed .overlay-event {
   color: var(--banner-surface-text);
   border: 1px solid var(--banner-border-color);
   box-shadow: 0 10px 22px var(--banner-shadow-color, rgba(15, 23, 42, 0.12));
-  transform: translateY(120%);
+  transform: translate(-50%, 120%);
   opacity: 0;
   pointer-events: none;
   z-index: 1;
@@ -370,6 +380,11 @@ body.overlay-fixed .overlay-event {
 
 .overlay-banner.is-active {
   animation: banner-rise-hold-fade 6.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.overlay-banner.is-persistent {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 .overlay-banner.is-team-b {
@@ -410,19 +425,19 @@ body.overlay-fixed .overlay-event {
   text-transform: uppercase;
   background: #0f172a;
   color: #ffffff;
-  font-size: 0.75rem;
+  font-size: 1.14rem;
 }
 
 .matchstats-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 120px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 144px minmax(0, 1fr);
   align-items: stretch;
   background: #ffffff;
 }
 
 .matchstats-column {
   display: grid;
-  grid-template-rows: 48px 58px repeat(4, 44px);
+  grid-template-rows: 52px repeat(4, 48px);
   min-width: 0;
 }
 
@@ -454,28 +469,18 @@ body.overlay-fixed .overlay-event {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  font-size: 0.75rem;
+  font-size: 1.14rem;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.matchstats-score {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2rem;
-  font-weight: 800;
-  color: inherit;
-  text-align: center;
-}
-
 .matchstats-value {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1rem;
+  font-size: 1.14rem;
   font-weight: 700;
   text-align: center;
 }
@@ -485,21 +490,17 @@ body.overlay-fixed .overlay-event {
   align-items: center;
   justify-content: center;
   padding: 0 0.4rem;
-  font-size: 0.7rem;
+  font-size: 1.14rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: #475569;
+  color: #000000;
   text-align: center;
-}
-
-.matchstats-label--section {
   font-weight: 700;
-  color: #0f172a;
 }
 
-.matchstats-label--score {
-  font-size: 0.72rem;
-  color: #334155;
+.matchstats-label--scoreline {
+  color: #000000;
+  letter-spacing: 0.16em;
 }
 
 .banner-left {
@@ -575,19 +576,19 @@ body.overlay-fixed .overlay-event {
 
 @keyframes banner-rise-hold-fade {
   0% {
-    transform: translateY(120%);
+    transform: translate(-50%, 120%);
     opacity: 0;
   }
   12% {
-    transform: translateY(0);
+    transform: translate(-50%, 0);
     opacity: 1;
   }
   82% {
-    transform: translateY(0);
+    transform: translate(-50%, 0);
     opacity: 1;
   }
   100% {
-    transform: translateY(0);
+    transform: translate(-50%, 0);
     opacity: 0;
   }
 }
