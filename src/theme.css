@@ -103,10 +103,7 @@
 body {
   margin: 0;
   font-family: var(--sc-font-body);
-  background: var(--sc-page-gradient),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 0, rgba(255, 255, 255, 0.02) 1px, transparent 1px, transparent 28px),
-    linear-gradient(0deg, rgba(255, 255, 255, 0.02) 0, rgba(255, 255, 255, 0.02) 1px, transparent 1px, transparent 28px);
-  background-color: var(--sc-bg);
+  background: var(--sc-bg);
   background-attachment: fixed;
   color: var(--sc-ink);
   text-rendering: optimizeLegibility;
