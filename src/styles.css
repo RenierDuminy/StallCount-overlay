@@ -659,6 +659,11 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.overlay-roster-stack {
+  display: grid;
+  gap: 1rem;
+}
+
 .overlay-roster-grid {
   display: grid;
   gap: 1rem;
@@ -685,11 +690,19 @@
 .overlay-roster-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
   padding: 0.35rem 0.5rem;
   border-radius: var(--sc-radius-sm);
   background: rgba(8, 28, 22, 0.35);
   border: 1px solid rgba(99, 255, 160, 0.16);
+}
+
+.overlay-roster-identity {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
 }
 
 .overlay-page--control .overlay-banner-event-row,
@@ -701,13 +714,14 @@
 .overlay-roster-number {
   min-width: 2.2rem;
   font-family: var(--sc-font-mono);
-  font-size: 0.8rem;
+  font-size: 0.95rem;
+  font-weight: 700;
   color: var(--sc-ink-muted);
   text-align: right;
 }
 
 .overlay-roster-name {
-  flex: 1;
+  min-width: 0;
 }
 
 .overlay-roster-tag {

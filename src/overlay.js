@@ -42,6 +42,7 @@ const elements = {
   eventName: document.getElementById("eventName"),
   matchClock: document.getElementById("matchClock"),
   statusLabel: document.getElementById("statusLabel"),
+  overlayBar: document.getElementById("overlayBar"),
   logo: document.getElementById("eventLogo"),
   logoFallback: document.getElementById("eventLogoFallback"),
   teamABox: document.getElementById("teamABox"),
@@ -74,8 +75,18 @@ const elements = {
   matchStatsTurnoversB: document.getElementById("matchStatsTurnoversB"),
   matchStatsBlocksA: document.getElementById("matchStatsBlocksA"),
   matchStatsBlocksB: document.getElementById("matchStatsBlocksB"),
+  teamRostersBanner: document.getElementById("teamRostersBanner"),
+  teamRostersTitle: document.getElementById("teamRostersTitle"),
+  teamRostersColumnA: document.getElementById("teamRostersColumnA"),
+  teamRostersColumnB: document.getElementById("teamRostersColumnB"),
+  teamRostersTeamA: document.getElementById("teamRostersTeamA"),
+  teamRostersTeamB: document.getElementById("teamRostersTeamB"),
+  teamRostersListA: document.getElementById("teamRostersListA"),
+  teamRostersListB: document.getElementById("teamRostersListB"),
   timeoutA: document.getElementById("timeoutBannerA"),
   timeoutB: document.getElementById("timeoutBannerB"),
+  fieldCallBanner: document.getElementById("fieldCallBanner"),
+  fieldCallBannerLabel: document.getElementById("fieldCallBannerLabel"),
   matchEventBanner: document.getElementById("matchEventBanner"),
   matchEventBannerLabel: document.getElementById("matchEventBannerLabel"),
 };
@@ -106,10 +117,14 @@ let bannerTimeout = null;
 let timeoutTimeout = null;
 let matchStatsTimeout = null;
 let matchEventTimeout = null;
+let fieldCallTimeout = null;
+let teamRostersTimeout = null;
 let activePlayerStatsKey = null;
 let activeMatchStatsKey = null;
 let activeTimeoutKey = null;
 let activeMatchEventKey = null;
+let activeFieldCallKey = null;
+let activeTeamRostersKey = null;
 
 function isAutoFadeEnabled(payload) {
   return payload?.autoFade !== false;
@@ -119,7 +134,9 @@ function getOverlayPayloadKey(payload) {
   if (!payload?.type) return "";
   if (payload.type === "playerStats") return `playerStats:${payload.playerId || payload.playerName || ""}`;
   if (payload.type === "matchStats") return "matchStats";
+  if (payload.type === "teamRosters") return "teamRosters";
   if (payload.type === "timeout") return `timeout:${(payload.team || "").toString().trim().toUpperCase()}`;
+  if (payload.type === "fieldCall") return `fieldCall:${(payload.callLabel || "").toString().trim().toUpperCase()}`;
   if (payload.type === "matchEvent") {
     return `matchEvent:${payload.eventTypeId || payload.eventCode || payload.eventDescription || ""}:${payload.team || ""}`;
   }
@@ -135,11 +152,19 @@ function handleOverlayBannerPayload(payload) {
     showMatchStatsBanner(payload);
     return;
   }
+  if (payload?.type === "teamRosters") {
+    showTeamRostersBanner(payload);
+    return;
+  }
   if (payload?.type === "timeout") {
     const team = (payload.team || "").toString().trim().toUpperCase();
     if (team === "A" || team === "B") {
       showTimeoutBanner(team, payload);
     }
+    return;
+  }
+  if (payload?.type === "fieldCall") {
+    showFieldCallBanner(payload);
     return;
   }
   if (payload?.type === "matchEvent") {
@@ -919,7 +944,8 @@ function updateOverlay(match, scoreboard) {
     derivedStatusLabel ||
     fallbackStatusLabel;
   const manualClockValue = manualOverrides?.enabled ? manualOverrides.clock : "";
-  const hideClock = !overlayInitialized && statusLabel === "STARTING SOON" && !manualClockValue;
+  const isClockRunning = Boolean(manualClockValue) || (Boolean(clockInfo.hasStarted) && !clockInfo.isPaused);
+  const hideClock = !isClockRunning;
   const derivedClock = clockInfo.clockText || "";
   const matchClock =
     manualClockValue ||
@@ -941,6 +967,9 @@ function updateOverlay(match, scoreboard) {
   if (elements.matchClock) elements.matchClock.textContent = matchClock;
   if (elements.matchClock?.parentElement) {
     elements.matchClock.parentElement.classList.toggle("is-hidden", hideClock);
+  }
+  if (elements.overlayBar) {
+    elements.overlayBar.classList.toggle("is-clock-hidden", hideClock);
   }
   if (elements.teamAName) elements.teamAName.textContent = teamAName;
   if (elements.teamBName) elements.teamBName.textContent = teamBName;
@@ -976,6 +1005,10 @@ function updateMatchStatsHeader({ teamAName, teamBName, scoreA, scoreB, teamACol
   }
   applyTeamColors(elements.matchStatsColumnA, teamAColors);
   applyTeamColors(elements.matchStatsColumnB, teamBColors);
+  if (elements.teamRostersTeamA) elements.teamRostersTeamA.textContent = teamAName;
+  if (elements.teamRostersTeamB) elements.teamRostersTeamB.textContent = teamBName;
+  applyTeamColors(elements.teamRostersColumnA, teamAColors);
+  applyTeamColors(elements.teamRostersColumnB, teamBColors);
 }
 
 function resolveBannerTeamStyles(teamId, teamSlot) {
@@ -1038,6 +1071,65 @@ function applyMatchStatsPayload(payload) {
   if (elements.matchStatsTitle && payload?.title) {
     elements.matchStatsTitle.textContent = payload.title;
   }
+}
+
+function renderRosterList(element, players) {
+  if (!element) return;
+  const nextChildren = (Array.isArray(players) && players.length ? players : [null]).map((player) => {
+    const item = document.createElement("li");
+    item.className = "roster-banner-item";
+    if (!player) {
+      item.textContent = "No players loaded.";
+      item.classList.add("is-empty");
+      return item;
+    }
+
+    const name = document.createElement("span");
+    name.className = "roster-banner-name";
+    name.textContent = (player.name || "Player").toString().trim();
+
+    const identity = document.createElement("span");
+    identity.className = "roster-banner-identity";
+
+    if (player.isCaptain) {
+      const captainTag = document.createElement("span");
+      captainTag.className = "roster-banner-tag roster-banner-tag--captain";
+      captainTag.textContent = "C";
+      identity.append(captainTag);
+    }
+
+    if (player.isSpiritCaptain) {
+      const spiritTag = document.createElement("span");
+      spiritTag.className = "roster-banner-tag roster-banner-tag--spirit";
+      spiritTag.textContent = "SC";
+      identity.append(spiritTag);
+    }
+
+    const number = document.createElement("span");
+    number.className = "roster-banner-number";
+    number.textContent = Number.isFinite(Number(player.number)) ? `#${player.number}` : "";
+
+    identity.append(name, number);
+    item.append(identity);
+
+    return item;
+  });
+  element.replaceChildren(...nextChildren);
+}
+
+function applyTeamRostersPayload(payload) {
+  if (elements.teamRostersTitle && payload?.title) {
+    elements.teamRostersTitle.textContent = payload.title;
+  }
+  if (elements.teamRostersTeamA && payload?.teamAName) {
+    elements.teamRostersTeamA.textContent = payload.teamAName;
+  }
+  if (elements.teamRostersTeamB && payload?.teamBName) {
+    elements.teamRostersTeamB.textContent = payload.teamBName;
+  }
+
+  renderRosterList(elements.teamRostersListA, payload?.rosters?.teamA);
+  renderRosterList(elements.teamRostersListB, payload?.rosters?.teamB);
 }
 
 function showBanner(payload) {
@@ -1119,6 +1211,27 @@ function showMatchStatsBanner(payload) {
   }
 }
 
+function showTeamRostersBanner(payload) {
+  if (!elements.teamRostersBanner) return;
+  const payloadKey = getOverlayPayloadKey(payload);
+
+  applyTeamRostersPayload(payload);
+  elements.teamRostersBanner.classList.remove("is-active");
+  void elements.teamRostersBanner.offsetWidth;
+  elements.teamRostersBanner.classList.add("is-active");
+  activeTeamRostersKey = payloadKey;
+
+  if (teamRostersTimeout) {
+    window.clearTimeout(teamRostersTimeout);
+    teamRostersTimeout = null;
+  }
+  teamRostersTimeout = window.setTimeout(() => {
+    elements.teamRostersBanner?.classList.remove("is-active");
+    activeTeamRostersKey = null;
+    teamRostersTimeout = null;
+  }, 10000);
+}
+
 function showTimeoutBanner(team, payload = null) {
   const target =
     team === "A" ? elements.timeoutA : team === "B" ? elements.timeoutB : null;
@@ -1156,6 +1269,51 @@ function showTimeoutBanner(team, payload = null) {
     }, 4200);
   } else {
     target.classList.add("is-persistent");
+  }
+}
+
+function getFieldCallLabel(payload) {
+  const rawLabel = (payload?.callLabel || payload?.label || "").toString().trim();
+  return rawLabel ? rawLabel.toUpperCase() : "FIELD CALL";
+}
+
+function hideFieldCallBanner() {
+  elements.fieldCallBanner?.classList.remove("is-active");
+  elements.fieldCallBanner?.classList.remove("is-persistent");
+  activeFieldCallKey = null;
+  if (fieldCallTimeout) {
+    window.clearTimeout(fieldCallTimeout);
+    fieldCallTimeout = null;
+  }
+}
+
+function showFieldCallBanner(payload) {
+  if (!elements.fieldCallBanner || !elements.fieldCallBannerLabel) return;
+  const payloadKey = getOverlayPayloadKey(payload);
+  const autoFade = isAutoFadeEnabled(payload);
+
+  if (!autoFade && activeFieldCallKey === payloadKey && elements.fieldCallBanner.classList.contains("is-active")) {
+    hideFieldCallBanner();
+    return;
+  }
+
+  elements.fieldCallBannerLabel.textContent = getFieldCallLabel(payload);
+  elements.fieldCallBanner.classList.remove("is-active");
+  elements.fieldCallBanner.classList.remove("is-persistent");
+  void elements.fieldCallBanner.offsetWidth;
+  elements.fieldCallBanner.classList.add("is-active");
+  activeFieldCallKey = payloadKey;
+
+  if (fieldCallTimeout) {
+    window.clearTimeout(fieldCallTimeout);
+    fieldCallTimeout = null;
+  }
+  if (autoFade) {
+    fieldCallTimeout = window.setTimeout(() => {
+      hideFieldCallBanner();
+    }, 4200);
+  } else {
+    elements.fieldCallBanner.classList.add("is-persistent");
   }
 }
 

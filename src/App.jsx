@@ -38,8 +38,11 @@ const APP_SETTINGS_STORAGE_KEY = "stallcount:overlay-control-settings";
 const BUTTON_DURATION_SECONDS = {
   playerStats: 6,
   matchStats: 8,
+  teamRosters: 10,
   timeout: 4,
+  fieldCall: 4,
 };
+const FIELD_CALL_OPTIONS = ["Pick", "Violation", "Foul", "Injury"];
 
 const eventTypeCache = new Map();
 let eventTypeCacheLoaded = false;
@@ -292,6 +295,7 @@ export default function App() {
   const [matchStatsAutoFade, setMatchStatsAutoFade] = useState(getInitialPopupAutoFade("matchStatsAutoFade"));
   const [timeoutAutoFade, setTimeoutAutoFade] = useState(getInitialPopupAutoFade("timeoutAutoFade"));
   const [matchEventAutoFade, setMatchEventAutoFade] = useState(getInitialPopupAutoFade("matchEventAutoFade"));
+  const [fieldCallAutoFade, setFieldCallAutoFade] = useState(getInitialPopupAutoFade("fieldCallAutoFade"));
   const [bannerPlayerId, setBannerPlayerId] = useState(getInitialBannerPlayerId());
   const [bannerStatus, setBannerStatus] = useState("");
   const [matchEventButtons, setMatchEventButtons] = useState([]);
@@ -552,6 +556,40 @@ export default function App() {
     }
   };
 
+  const handleTriggerTeamRosters = async () => {
+    const payload = {
+      type: "teamRosters",
+      title: "Team rosters",
+      teamAName: matchDetails?.team_a?.name || "Team A",
+      teamBName: matchDetails?.team_b?.name || "Team B",
+      rosters: {
+        teamA: teamARoster.map((player) => ({
+          id: player.id,
+          name: player.name,
+          number: player.number,
+          isCaptain: Boolean(player.isCaptain),
+          isSpiritCaptain: Boolean(player.isSpiritCaptain),
+        })),
+        teamB: teamBRoster.map((player) => ({
+          id: player.id,
+          name: player.name,
+          number: player.number,
+          isCaptain: Boolean(player.isCaptain),
+          isSpiritCaptain: Boolean(player.isSpiritCaptain),
+        })),
+      },
+      ts: Date.now(),
+    };
+    try {
+      await publishOverlayPayload(payload);
+      setBannerStatus("Team rosters overlay queued.");
+      window.setTimeout(() => setBannerStatus(""), 3000);
+    } catch (error) {
+      setBannerStatus("Unable to trigger team rosters overlay.");
+      window.setTimeout(() => setBannerStatus(""), 3000);
+    }
+  };
+
   const handleTriggerTimeout = async (team) => {
     if (!team) return;
     const payload = {
@@ -587,6 +625,24 @@ export default function App() {
       window.setTimeout(() => setBannerStatus(""), 3000);
     } catch (error) {
       setBannerStatus("Unable to trigger match event.");
+      window.setTimeout(() => setBannerStatus(""), 3000);
+    }
+  };
+
+  const handleTriggerFieldCall = async (callLabel) => {
+    if (!callLabel) return;
+    const payload = {
+      type: "fieldCall",
+      autoFade: fieldCallAutoFade,
+      callLabel,
+      ts: Date.now(),
+    };
+    try {
+      await publishOverlayPayload(payload);
+      setBannerStatus(`Field call banner queued (${callLabel}).`);
+      window.setTimeout(() => setBannerStatus(""), 3000);
+    } catch (error) {
+      setBannerStatus("Unable to trigger field call banner.");
       window.setTimeout(() => setBannerStatus(""), 3000);
     }
   };
@@ -652,6 +708,7 @@ export default function App() {
       matchStatsAutoFade,
       timeoutAutoFade,
       matchEventAutoFade,
+      fieldCallAutoFade,
       bannerPlayerId,
     };
 
@@ -678,6 +735,7 @@ export default function App() {
     matchStatsAutoFade,
     timeoutAutoFade,
     matchEventAutoFade,
+    fieldCallAutoFade,
     bannerPlayerId,
   ]);
 
@@ -1645,6 +1703,25 @@ export default function App() {
                         ) : null}
                       </div>
 
+                      <div className="overlay-banner-block">
+                        <div className="overlay-banner-block__header">
+                          <div className="overlay-banner-block__title">Field calls</div>
+                          {renderAutoFadeToggle(fieldCallAutoFade, setFieldCallAutoFade)}
+                        </div>
+                        <div className="overlay-banner-actions">
+                          {FIELD_CALL_OPTIONS.map((callLabel) => (
+                            <button
+                              key={callLabel}
+                              type="button"
+                              className="sc-button is-ghost"
+                              onClick={() => handleTriggerFieldCall(callLabel)}
+                            >
+                              {formatTimedButtonLabel(callLabel, BUTTON_DURATION_SECONDS.fieldCall)}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
                       {bannerStatus ? (
                         <p className="overlay-banner-status">{bannerStatus}</p>
                       ) : null}
@@ -1655,7 +1732,14 @@ export default function App() {
                     <SectionHeader
                       title="Team rosters"
                       description="Players loaded for the active event."
-                      action={<Chip variant="ghost">{teamARoster.length + teamBRoster.length} players</Chip>}
+                      action={
+                        <>
+                          <button type="button" className="sc-button is-ghost" onClick={handleTriggerTeamRosters}>
+                            {formatTimedButtonLabel("Show overlay", BUTTON_DURATION_SECONDS.teamRosters)}
+                          </button>
+                          <Chip variant="ghost">{teamARoster.length + teamBRoster.length} players</Chip>
+                        </>
+                      }
                       divider
                     />
 
@@ -1664,66 +1748,72 @@ export default function App() {
                     ) : rosterError ? (
                       <p className="overlay-data-state overlay-data-state--error">{rosterError}</p>
                     ) : teamARoster.length || teamBRoster.length ? (
-                      <div className="overlay-roster-grid">
-                        <div>
-                          <div className="overlay-roster-title">{matchDetails?.team_a?.name || "Team A"}</div>
-                          <ul className="overlay-roster-list">
-                            {teamARoster.length ? (
-                              teamARoster.map((player, index) => (
-                                <li className="overlay-roster-item" key={`team-a-${index}`}>
-                                  <span className="overlay-roster-number">
-                                    {Number.isFinite(Number(player.number)) ? player.number : ""}
-                                  </span>
-                                  <span className="overlay-roster-name">{player.name}</span>
-                                  {player.isCaptain ? (
-                                    <span className="overlay-roster-tag overlay-roster-tag--captain" aria-label="Captain">
-                                      C
+                      <div className="overlay-roster-stack">
+                        <div className="overlay-roster-grid">
+                          <div>
+                            <div className="overlay-roster-title">{matchDetails?.team_a?.name || "Team A"}</div>
+                            <ul className="overlay-roster-list">
+                              {teamARoster.length ? (
+                                teamARoster.map((player, index) => (
+                                  <li className="overlay-roster-item" key={`team-a-${index}`}>
+                                    <span className="overlay-roster-identity">
+                                      {player.isCaptain ? (
+                                        <span className="overlay-roster-tag overlay-roster-tag--captain" aria-label="Captain">
+                                          C
+                                        </span>
+                                      ) : null}
+                                      {player.isSpiritCaptain ? (
+                                        <span
+                                          className="overlay-roster-tag overlay-roster-tag--spirit"
+                                          aria-label="Spirit captain"
+                                        >
+                                          SC
+                                        </span>
+                                      ) : null}
+                                      <span className="overlay-roster-name">{player.name}</span>
+                                      <span className="overlay-roster-number">
+                                        {Number.isFinite(Number(player.number)) ? player.number : " "}
+                                      </span>
                                     </span>
-                                  ) : null}
-                                  {player.isSpiritCaptain ? (
-                                    <span
-                                      className="overlay-roster-tag overlay-roster-tag--spirit"
-                                      aria-label="Spirit captain"
-                                    >
-                                      SC
+                                  </li>
+                                ))
+                              ) : (
+                                <li className="overlay-roster-empty">No players loaded.</li>
+                              )}
+                            </ul>
+                          </div>
+                          <div>
+                            <div className="overlay-roster-title">{matchDetails?.team_b?.name || "Team B"}</div>
+                            <ul className="overlay-roster-list">
+                              {teamBRoster.length ? (
+                                teamBRoster.map((player, index) => (
+                                  <li className="overlay-roster-item" key={`team-b-${index}`}>
+                                    <span className="overlay-roster-identity">
+                                      {player.isCaptain ? (
+                                        <span className="overlay-roster-tag overlay-roster-tag--captain" aria-label="Captain">
+                                          C
+                                        </span>
+                                      ) : null}
+                                      {player.isSpiritCaptain ? (
+                                        <span
+                                          className="overlay-roster-tag overlay-roster-tag--spirit"
+                                          aria-label="Spirit captain"
+                                        >
+                                          SC
+                                        </span>
+                                      ) : null}
+                                      <span className="overlay-roster-name">{player.name}</span>
+                                      <span className="overlay-roster-number">
+                                        {Number.isFinite(Number(player.number)) ? player.number : " "}
+                                      </span>
                                     </span>
-                                  ) : null}
-                                </li>
-                              ))
-                            ) : (
-                              <li className="overlay-roster-empty">No players loaded.</li>
-                            )}
-                          </ul>
-                        </div>
-                        <div>
-                          <div className="overlay-roster-title">{matchDetails?.team_b?.name || "Team B"}</div>
-                          <ul className="overlay-roster-list">
-                            {teamBRoster.length ? (
-                              teamBRoster.map((player, index) => (
-                                <li className="overlay-roster-item" key={`team-b-${index}`}>
-                                  <span className="overlay-roster-number">
-                                    {Number.isFinite(Number(player.number)) ? player.number : ""}
-                                  </span>
-                                  <span className="overlay-roster-name">{player.name}</span>
-                                  {player.isCaptain ? (
-                                    <span className="overlay-roster-tag overlay-roster-tag--captain" aria-label="Captain">
-                                      C
-                                    </span>
-                                  ) : null}
-                                  {player.isSpiritCaptain ? (
-                                    <span
-                                      className="overlay-roster-tag overlay-roster-tag--spirit"
-                                      aria-label="Spirit captain"
-                                    >
-                                      SC
-                                    </span>
-                                  ) : null}
-                                </li>
-                              ))
-                            ) : (
-                              <li className="overlay-roster-empty">No players loaded.</li>
-                            )}
-                          </ul>
+                                  </li>
+                                ))
+                              ) : (
+                                <li className="overlay-roster-empty">No players loaded.</li>
+                              )}
+                            </ul>
+                          </div>
                         </div>
                       </div>
                     ) : (

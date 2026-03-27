@@ -40,7 +40,7 @@
     <div id="viewport">
       <div id="canvas">
         <div class="overlay-root">
-          <div class="overlay-bar">
+          <div class="overlay-bar" id="overlayBar">
             <div class="overlay-logo">
               <img id="eventLogo" alt="League logo" src="./stallcount-logo.png" />
               <span class="overlay-logo-fallback" id="eventLogoFallback">SC</span>
@@ -78,6 +78,10 @@
 
             <div class="overlay-clock">
               <span class="match-clock" id="matchClock">--:--</span>
+            </div>
+
+            <div class="overlay-field-call" id="fieldCallBanner" aria-live="polite">
+              <span class="timeout-label" id="fieldCallBannerLabel">FIELD CALL</span>
             </div>
           </div>
 
@@ -139,6 +143,22 @@
                   <div class="matchstats-value" id="matchStatsBreaksB">--</div>
                   <div class="matchstats-value" id="matchStatsTurnoversB">--</div>
                   <div class="matchstats-value" id="matchStatsBlocksB">--</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="overlay-roster-banner" id="teamRostersBanner" aria-live="polite">
+            <div class="matchstats-card roster-card">
+              <div class="matchstats-title" id="teamRostersTitle">Team rosters</div>
+              <div class="roster-banner-body">
+                <div class="roster-banner-column" id="teamRostersColumnA">
+                  <div class="matchstats-team roster-banner-team" id="teamRostersTeamA">Team A</div>
+                  <ul class="roster-banner-list" id="teamRostersListA"></ul>
+                </div>
+                <div class="roster-banner-column" id="teamRostersColumnB">
+                  <div class="matchstats-team roster-banner-team" id="teamRostersTeamB">Team B</div>
+                  <ul class="roster-banner-list" id="teamRostersListB"></ul>
                 </div>
               </div>
             </div>
