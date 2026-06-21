@@ -1,21 +1,9 @@
-﻿import { useEffect, useMemo, useState } from "react";
-import { Card, Chip, Field, Input, SectionHeader, SectionShell, Select } from "./components/ui/primitives";
-import { MatchEventCard } from "./components/eventCards";
+import { useEffect, useMemo, useState } from "react";
+import { SectionShell } from "./components/ui/primitives";
 import { supabase } from "./lib/supabaseClient";
 import { MATCH_LOG_EVENT_CODES } from "./services/matchLogService";
-
-const OVERLAY_OPTIONS = [
-  {
-    value: "overlay-wfdf-competitive.html",
-    label: "WFDF competitive (fixed 16:9)",
-    description: "Fixed 1920x1080 canvas that scales for any OBS viewport.",
-  },
-  {
-    value: "custom",
-    label: "Custom file",
-    description: "Point to a different overlay HTML file.",
-  },
-];
+import { ConfigView } from "./views/ConfigView";
+import { ControlView } from "./views/ControlView";
 
 const BASE_PATH = import.meta.env.BASE_URL || "/";
 const NORMALIZED_BASE = BASE_PATH.endsWith("/") ? BASE_PATH : `${BASE_PATH}/`;
@@ -35,14 +23,6 @@ const MATCH_LOG_FIELDS =
   "id, match_id, event_type_id, team_id, actor_id, secondary_actor_id, created_at, abba_line";
 const MATCH_LOG_PAGE_SIZE = 1000;
 const APP_SETTINGS_STORAGE_KEY = "stallcount:overlay-control-settings";
-const BUTTON_DURATION_SECONDS = {
-  playerStats: 6,
-  matchStats: 8,
-  teamRosters: 10,
-  timeout: 4,
-  fieldCall: 4,
-};
-const FIELD_CALL_OPTIONS = ["Pick", "Violation", "Foul", "Injury"];
 
 const eventTypeCache = new Map();
 let eventTypeCacheLoaded = false;
@@ -161,6 +141,30 @@ function getInitialBannerPlayerId() {
   return (readPersistedAppSettings().bannerPlayerId || "").toString().trim();
 }
 
+const LOGO_STORAGE_KEY_A = "stallcount:logo-team-a";
+const LOGO_STORAGE_KEY_B = "stallcount:logo-team-b";
+const LOGO_STORAGE_KEY_EVENT = "stallcount:logo-event";
+
+function readLogoDataUrl(key) {
+  try {
+    return window.localStorage.getItem(key) || "";
+  } catch {
+    return "";
+  }
+}
+
+function saveLogoDataUrl(key, dataUrl) {
+  try {
+    if (dataUrl) {
+      window.localStorage.setItem(key, dataUrl);
+    } else {
+      window.localStorage.removeItem(key);
+    }
+  } catch {
+    // Ignore — data URL may exceed storage quota on some browsers.
+  }
+}
+
 function getInitialPopupAutoFade(key) {
   const persistedValue = readPersistedAppSettings()[key];
   return typeof persistedValue === "boolean" ? persistedValue : true;
@@ -213,11 +217,6 @@ function normalizeOverlayPath(value) {
 
 function isAbsoluteUrl(value) {
   return /^https?:\/\//i.test(value);
-}
-
-function formatTimedButtonLabel(label, seconds) {
-  if (!Number.isFinite(seconds)) return label;
-  return `${label} (${seconds}s)`;
 }
 
 function buildOverlayUrl({
@@ -275,6 +274,26 @@ function buildOverlayUrl({
   return url.toString();
 }
 
+function resolveEventCode(eventType) {
+  const rawCode = (eventType?.code || "").toString().trim().toLowerCase();
+  if (rawCode) return rawCode;
+
+  const description = (eventType?.description || "").toString().trim().toLowerCase();
+  if (!description) return "";
+
+  if (description.includes("calahan")) return MATCH_LOG_EVENT_CODES.CALAHAN;
+  if (description.includes("score")) return MATCH_LOG_EVENT_CODES.SCORE;
+  if (description.includes("timeout")) return MATCH_LOG_EVENT_CODES.TIMEOUT;
+  if (description.includes("halftime")) return MATCH_LOG_EVENT_CODES.HALFTIME_START;
+  if (description.includes("turnover")) return MATCH_LOG_EVENT_CODES.TURNOVER;
+  if (description.includes("block")) return MATCH_LOG_EVENT_CODES.BLOCK;
+  if (description.includes("stoppage")) return MATCH_LOG_EVENT_CODES.STOPPAGE_START;
+  if (description.includes("match start")) return MATCH_LOG_EVENT_CODES.MATCH_START;
+  if (description.includes("match end")) return MATCH_LOG_EVENT_CODES.MATCH_END;
+
+  return description.replace(/\s+/g, "_");
+}
+
 export default function App() {
   const overlayBannerChannelRef = useMemo(() => ({ current: null }), []);
   const [overlayChoice, setOverlayChoice] = useState(getInitialOverlayChoice());
@@ -312,10 +331,27 @@ export default function App() {
   const [rosterError, setRosterError] = useState("");
   const [rosterPlayersById, setRosterPlayersById] = useState({});
   const [rosterByTeam, setRosterByTeam] = useState({});
+  const [teamALogo, setTeamALogoState] = useState(() => readLogoDataUrl(LOGO_STORAGE_KEY_A));
+  const [teamBLogo, setTeamBLogoState] = useState(() => readLogoDataUrl(LOGO_STORAGE_KEY_B));
+  const [eventLogo, setEventLogoState] = useState(() => readLogoDataUrl(LOGO_STORAGE_KEY_EVENT));
+
+  const setTeamALogo = (dataUrl) => {
+    saveLogoDataUrl(LOGO_STORAGE_KEY_A, dataUrl);
+    setTeamALogoState(dataUrl);
+  };
+  const setTeamBLogo = (dataUrl) => {
+    saveLogoDataUrl(LOGO_STORAGE_KEY_B, dataUrl);
+    setTeamBLogoState(dataUrl);
+  };
+  const setEventLogo = (dataUrl) => {
+    saveLogoDataUrl(LOGO_STORAGE_KEY_EVENT, dataUrl);
+    setEventLogoState(dataUrl);
+  };
 
   const trimmedMatchId = matchId.trim();
   const hasMatchId = Boolean(trimmedMatchId);
   const resolvedOverlayFile = overlayChoice === "custom" ? customOverlay : overlayChoice;
+
   const overlayUrl = useMemo(
     () =>
       trimmedMatchId
@@ -349,6 +385,7 @@ export default function App() {
       isInitialized,
     ],
   );
+
   const overlayPreviewUrl = useMemo(() => {
     if (!overlayUrl) return "";
     try {
@@ -359,6 +396,7 @@ export default function App() {
       return overlayUrl;
     }
   }, [overlayUrl]);
+
   const teamAPalette = useMemo(
     () => getTeamPalette(matchDetails?.team_a?.attributes, teamATheme),
     [matchDetails?.team_a?.attributes, teamATheme],
@@ -367,8 +405,10 @@ export default function App() {
     () => getTeamPalette(matchDetails?.team_b?.attributes, teamBTheme),
     [matchDetails?.team_b?.attributes, teamBTheme],
   );
+
   const teamARoster = rosterByTeam[matchDetails?.team_a?.id] || [];
   const teamBRoster = rosterByTeam[matchDetails?.team_b?.id] || [];
+
   const bannerPlayerOptions = useMemo(() => {
     const combined = [...teamARoster, ...teamBRoster].filter((player) => player?.name);
     const withNumbers = [];
@@ -391,36 +431,11 @@ export default function App() {
 
     return [...withNumbers, ...withoutNumbers];
   }, [teamARoster, teamBRoster]);
+
   const selectedBannerPlayer = useMemo(
     () => bannerPlayerOptions.find((player) => player.id === bannerPlayerId) || null,
     [bannerPlayerOptions, bannerPlayerId],
   );
-  const bannerEventGroups = useMemo(() => {
-    const scoreOnly = [];
-    const stoppage = [];
-    let halftimeEvent = null;
-
-    matchEventButtons.forEach((eventType) => {
-      const code = (eventType?.code || "").toString().toLowerCase();
-      const description = (eventType?.description || "").toString().toLowerCase();
-      const combined = `${code} ${description}`.trim();
-
-      if (!halftimeEvent && combined.includes("half")) {
-        halftimeEvent = eventType;
-      }
-
-      if (combined.includes("stoppage")) {
-        stoppage.push(eventType);
-        return;
-      }
-
-      if (combined.includes("score") || combined.includes("goal") || combined.includes("calahan")) {
-        scoreOnly.push(eventType);
-      }
-    });
-
-    return { scoreOnly, stoppage, halftimeEvent };
-  }, [matchEventButtons]);
 
   const canPreview = Boolean(overlayUrl && hasMatchId);
   const canInitialize = Boolean(trimmedMatchId);
@@ -428,19 +443,6 @@ export default function App() {
   const showControl = isInitialized && hasMatchId;
   const isControlView = activeView === "control";
   const isConfigView = activeView === "config";
-
-  const overlayOption = OVERLAY_OPTIONS.find((option) => option.value === overlayChoice);
-  const overlayDescription = overlayOption?.description;
-
-  const renderAutoFadeToggle = (checked, onChange) => (
-    <label className="overlay-switch">
-      <span className="overlay-switch__label">Auto fade</span>
-      <span className="overlay-switch__control">
-        <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
-        <span className="overlay-switch__slider" aria-hidden="true"></span>
-      </span>
-    </label>
-  );
 
   const handleCopy = async () => {
     if (!overlayUrl) return;
@@ -586,6 +588,29 @@ export default function App() {
       window.setTimeout(() => setBannerStatus(""), 3000);
     } catch (error) {
       setBannerStatus("Unable to trigger team rosters overlay.");
+      window.setTimeout(() => setBannerStatus(""), 3000);
+    }
+  };
+
+  const handleTriggerBreakChance = async (team, autoFade = timeoutAutoFade) => {
+    if (!team) return;
+    const payload = { type: "breakChance", autoFade, team, ts: Date.now() };
+    try {
+      await publishOverlayPayload(payload);
+      setBannerStatus(`Break chance banner queued for Team ${team}.`);
+      window.setTimeout(() => setBannerStatus(""), 3000);
+    } catch (error) {
+      setBannerStatus("Unable to trigger break chance banner.");
+      window.setTimeout(() => setBannerStatus(""), 3000);
+    }
+  };
+
+  const handleTestBreakChance = async () => {
+    try {
+      await handleTriggerBreakChance("A", true);
+      window.setTimeout(() => handleTriggerBreakChance("B", true), 5000);
+    } catch (error) {
+      setBannerStatus("Unable to run break chance test.");
       window.setTimeout(() => setBannerStatus(""), 3000);
     }
   };
@@ -1013,42 +1038,19 @@ export default function App() {
     };
   }, [trimmedMatchId]);
 
-  const formatDate = (value) => {
-    if (!value) return "--";
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return String(value);
-    return parsed.toLocaleDateString();
-  };
+  const sortedMatchLogs = useMemo(
+    () =>
+      [...matchLogs].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
+    [matchLogs],
+  );
 
-  const formatDateTime = (value) => {
-    if (!value) return "--";
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return String(value);
-    return `${parsed.toLocaleDateString()} ${parsed.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    })}`;
-  };
-
-  const resolveEventCode = (eventType) => {
-    const rawCode = (eventType?.code || "").toString().trim().toLowerCase();
-    if (rawCode) return rawCode;
-
-    const description = (eventType?.description || "").toString().trim().toLowerCase();
-    if (!description) return "";
-
-    if (description.includes("calahan")) return MATCH_LOG_EVENT_CODES.CALAHAN;
-    if (description.includes("score")) return MATCH_LOG_EVENT_CODES.SCORE;
-    if (description.includes("timeout")) return MATCH_LOG_EVENT_CODES.TIMEOUT;
-    if (description.includes("halftime")) return MATCH_LOG_EVENT_CODES.HALFTIME_START;
-    if (description.includes("turnover")) return MATCH_LOG_EVENT_CODES.TURNOVER;
-    if (description.includes("block")) return MATCH_LOG_EVENT_CODES.BLOCK;
-    if (description.includes("stoppage")) return MATCH_LOG_EVENT_CODES.STOPPAGE_START;
-    if (description.includes("match start")) return MATCH_LOG_EVENT_CODES.MATCH_START;
-    if (description.includes("match end")) return MATCH_LOG_EVENT_CODES.MATCH_END;
-
-    return description.replace(/\s+/g, "_");
-  };
+  const resolvedEventCodeCache = useMemo(() => {
+    const cache = new Map();
+    eventTypeCache.forEach((eventType, id) => {
+      cache.set(id, resolveEventCode(eventType));
+    });
+    return cache;
+  }, [eventTypesVersion]);
 
   const resolvePlayerName = (playerId) => {
     if (!playerId) return "";
@@ -1056,17 +1058,16 @@ export default function App() {
   };
 
   const eventCardLogs = useMemo(() => {
-    if (!matchLogs.length) return [];
+    if (!sortedMatchLogs.length) return [];
     const teamAId = matchDetails?.team_a?.id;
     const teamBId = matchDetails?.team_b?.id;
     let totalA = 0;
     let totalB = 0;
 
-    const chronologicalLogs = [...matchLogs]
-      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    const chronologicalLogs = sortedMatchLogs
       .map((log, index) => {
         const eventType = eventTypeCache.get(log.event_type_id);
-        const eventCode = resolveEventCode(eventType);
+        const eventCode = resolvedEventCodeCache.get(log.event_type_id) ?? resolveEventCode(eventType);
         const eventDescription = eventType?.description || eventType?.code || "Match event";
         const team = log.team_id === teamAId ? "A" : log.team_id === teamBId ? "B" : null;
         const isScoreEvent =
@@ -1100,11 +1101,11 @@ export default function App() {
 
     return chronologicalLogs.slice().reverse();
   }, [
-    matchLogs,
+    sortedMatchLogs,
     matchDetails?.team_a?.id,
     matchDetails?.team_b?.id,
     rosterPlayersById,
-    eventTypesVersion,
+    resolvedEventCodeCache,
   ]);
 
   const matchStats = useMemo(() => {
@@ -1157,13 +1158,9 @@ export default function App() {
     let scoreB = 0;
     let hasScoreEvents = false;
 
-    const orderedLogs = [...matchLogs].sort(
-      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-    );
-
-    for (const log of orderedLogs) {
+    for (const log of sortedMatchLogs) {
       const eventType = eventTypeCache.get(log.event_type_id);
-      const eventCode = resolveEventCode(eventType);
+      const eventCode = resolvedEventCodeCache.get(log.event_type_id) ?? resolveEventCode(eventType);
       const eventCodeLower = (eventCode || "").toLowerCase();
       const eventLabel = (eventType?.description || eventType?.code || "").toString();
       const normalizedLabel = eventLabel.trim().toLowerCase();
@@ -1239,693 +1236,95 @@ export default function App() {
       blocksA: totals.teamA.blocks,
       blocksB: totals.teamB.blocks,
     };
-  }, [matchDetails, matchLogs, eventTypesVersion]);
-
-  const noop = () => {};
-
-  const formatStatValue = (value) => {
-    if (value === null || value === undefined || value === "") {
-      return "--";
-    }
-    return value;
-  };
-
-  const renderRulesValue = (value, keyPrefix = "") => {
-    if (value === null || value === undefined) {
-      return <span className="rules-empty">--</span>;
-    }
-
-    if (Array.isArray(value)) {
-      if (!value.length) return <span className="rules-empty">Empty list</span>;
-      return (
-        <ul className="rules-list">
-          {value.map((item, index) => (
-            <li className="rules-item" key={`${keyPrefix}-${index}`}>
-              <span className="rules-key">[{index + 1}]</span>
-              <div className="rules-value">{renderRulesValue(item, `${keyPrefix}-${index}`)}</div>
-            </li>
-          ))}
-        </ul>
-      );
-    }
-
-    if (typeof value === "object") {
-      const entries = Object.entries(value);
-      if (!entries.length) return <span className="rules-empty">No details</span>;
-      return (
-        <ul className="rules-list">
-          {entries.map(([key, itemValue]) => (
-            <li className="rules-item" key={`${keyPrefix}-${key}`}>
-              <span className="rules-key">{key}</span>
-              <div className="rules-value">{renderRulesValue(itemValue, `${keyPrefix}-${key}`)}</div>
-            </li>
-          ))}
-        </ul>
-      );
-    }
-
-    return <span className="rules-leaf">{String(value)}</span>;
-  };
+  }, [matchDetails, sortedMatchLogs, resolvedEventCodeCache]);
 
   return (
     <div className={`sc-page overlay-page ${isControlView ? "overlay-page--control" : ""}`}>
       <div className="sc-page__glow" aria-hidden="true" />
       <SectionShell className="overlay-shell">
         {isConfigView ? (
-          <header className="overlay-header overlay-header--minimal">
-            <div className="overlay-header__text">
-              <Chip>Overlay</Chip>
-              <h1 className="overlay-header__title">Configuration</h1>
-              <p className="overlay-header__subtitle">
-                Initialize the overlay and confirm the live preview.
-              </p>
-            </div>
-          </header>
-        ) : (
-          <header className="overlay-header overlay-header--minimal overlay-header--compact overlay-header--with-actions">
-            <div className="overlay-header__text">
-              <h1 className="overlay-header__title overlay-header__title--compact">Control</h1>
-            </div>
-            <div className="overlay-header__actions">
-              <button
-                type="button"
-                className={`sc-button is-ghost ${overlayUrl ? "" : "is-disabled"}`}
-                onClick={handleCopy}
-                disabled={!overlayUrl}
-              >
-                {copied ? "Copied" : "Copy URL"}
-              </button>
-              <a
-                className={`sc-button ${canPreview ? "" : "is-disabled"}`}
-                href={canPreview ? overlayUrl : undefined}
-                target="_blank"
-                rel="noreferrer"
-                aria-disabled={!canPreview}
-              >
-                Open overlay
-              </a>
-              <a className="sc-button is-ghost" href="#config">
-                Back
-              </a>
-            </div>
-          </header>
-        )}
-
-        {isConfigView ? (
-          <section className="overlay-section">
-            <SectionHeader
-              title="Configuration"
-              description="Set the overlay source and match. Once initialized, configuration locks."
-              divider
-            />
-
-            <div className="overlay-config-layout">
-              <Card className="overlay-card overlay-config-card">
-                <div className="overlay-form">
-                  <Field
-                    label="Overlay file"
-                    hint="Defaults to the WFDF competitive overlay shipped with this project."
-                  >
-                    <Select
-                      value={overlayChoice}
-                      onChange={(event) => setOverlayChoice(event.target.value)}
-                      disabled={configLocked}
-                    >
-                      {OVERLAY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-                    {overlayDescription ? (
-                      <p className="overlay-option-note">{overlayDescription}</p>
-                    ) : null}
-                  </Field>
-
-                  {overlayChoice === "custom" ? (
-                    <Field
-                      label="Custom overlay path"
-                      hint="Choose an HTML overlay file to use for the preview and URL."
-                    >
-                      <Input
-                        type="file"
-                        accept=".html,.htm,text/html"
-                        onChange={(event) => {
-                          const file = event.target.files?.[0];
-                          setCustomOverlay(file ? file.name : "");
-                        }}
-                        disabled={configLocked}
-                      />
-                      {customOverlay ? <p className="overlay-option-note">Selected: {customOverlay}</p> : null}
-                    </Field>
-                  ) : null}
-
-                  <Field
-                    label="Match ID"
-                    hint="Required for live data and preview updates."
-                    action={hasMatchId ? "Ready" : "Required"}
-                  >
-                    <Input
-                      value={matchId}
-                      onChange={(event) => setMatchId(event.target.value)}
-                      placeholder="e.g. 5e2b7c94"
-                      disabled={configLocked}
-                    />
-                    {trimmedMatchId ? (
-                      isLoadingDetails ? (
-                        <p className="overlay-option-note">Loading match details...</p>
-                      ) : detailsError ? (
-                        <p className="overlay-data-state overlay-data-state--error">{detailsError}</p>
-                      ) : matchDetails ? (
-                        <div className="overlay-match-summary">
-                          <div className="overlay-match-summary__title">
-                            {(matchDetails.team_a?.name || "Team A")} vs {(matchDetails.team_b?.name || "Team B")}
-                          </div>
-                          <div className="overlay-match-summary__meta">
-                            <span>Start: {formatDateTime(matchDetails.start_time)}</span>
-                            <span>Venue: {matchDetails.event?.location || eventDetails?.location || "--"}</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="overlay-option-note">No match information found for this ID.</p>
-                      )
-                    ) : null}
-                  </Field>
-
-                  <Field
-                    label="Team colors"
-                    hint="Pick primary or secondary team colors from the attributes payload."
-                  >
-                    <div className="overlay-team-toggle-grid">
-                      <div className="overlay-team-toggle">
-                        <span className="overlay-team-toggle__label">
-                          {matchDetails?.team_a?.name || "Team A"}
-                        </span>
-                        <Select
-                          value={teamATheme}
-                          onChange={(event) => setTeamATheme(event.target.value)}
-                          disabled={configLocked}
-                        >
-                          <option value="primary">Primary color</option>
-                          <option value="secondary">Secondary color</option>
-                        </Select>
-                        <div
-                          className="overlay-team-preview"
-                          style={{ backgroundColor: teamAPalette.bg, color: teamAPalette.text }}
-                        >
-                          <span className="overlay-team-preview__kicker">Demo ({teamAPalette.label})</span>
-                          <span className="overlay-team-preview__name">
-                            {matchDetails?.team_a?.name || "Team A"}
-                          </span>
-                          <span className="overlay-team-preview__meta">{teamAPalette.bg}</span>
-                        </div>
-                      </div>
-                      <div className="overlay-team-toggle">
-                        <span className="overlay-team-toggle__label">
-                          {matchDetails?.team_b?.name || "Team B"}
-                        </span>
-                        <Select
-                          value={teamBTheme}
-                          onChange={(event) => setTeamBTheme(event.target.value)}
-                          disabled={configLocked}
-                        >
-                          <option value="primary">Primary color</option>
-                          <option value="secondary">Secondary color</option>
-                        </Select>
-                        <div
-                          className="overlay-team-preview"
-                          style={{ backgroundColor: teamBPalette.bg, color: teamBPalette.text }}
-                        >
-                          <span className="overlay-team-preview__kicker">Demo ({teamBPalette.label})</span>
-                          <span className="overlay-team-preview__name">
-                            {matchDetails?.team_b?.name || "Team B"}
-                          </span>
-                          <span className="overlay-team-preview__meta">{teamBPalette.bg}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </Field>
-                </div>
-              </Card>
-
-              <Card className="overlay-card overlay-preview-card overlay-preview-card--lite">
-                <SectionHeader
-                  title="Preview"
-                  description="Light 16:9 preview of the live overlay."
-                  action={<Chip variant="tag">16:9</Chip>}
-                  divider
-                />
-
-                <div className="preview-stage" aria-live="polite">
-                  <img
-                    className="preview-stage__image"
-                    src="/overlay-demo.jpg"
-                    alt="Preview base"
-                    loading="lazy"
-                  />
-                  {canPreview ? (
-                    <iframe
-                      title="Overlay preview"
-                      className="preview-frame preview-frame--overlay"
-                      src={overlayPreviewUrl}
-                    />
-                  ) : (
-                    <div className="preview-placeholder">
-                      <div>
-                        <p className="preview-placeholder__title">Preview waiting</p>
-                        <p className="preview-placeholder__body">
-                          Add a match ID to load the overlay preview in this 16:9 frame.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </Card>
-
-              <div className="overlay-config-actions">
-                <p className="overlay-lock-hint">
-                  {configLocked
-                    ? "Configuration locked. Unlock to make changes."
-                    : "Lock configuration to enable controls."}
-                </p>
-                <div className="overlay-config-actions__buttons">
-                  {configLocked ? (
-                    <button type="button" className="sc-button is-ghost" onClick={handleUnlock}>
-                      Unlock
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className={`sc-button ${canInitialize ? "" : "is-disabled"}`}
-                      onClick={handleInitialize}
-                      disabled={!canInitialize}
-                    >
-                      Lock configuration
-                    </button>
-                  )}
-                  <a
-                    className={`sc-button is-ghost ${showControl ? "" : "is-disabled"}`}
-                    href={showControl ? "#control" : undefined}
-                    aria-disabled={!showControl}
-                  >
-                    Control section
-                  </a>
-                </div>
-              </div>
-            </div>
-          </section>
+          <ConfigView
+            overlayChoice={overlayChoice}
+            setOverlayChoice={setOverlayChoice}
+            customOverlay={customOverlay}
+            setCustomOverlay={setCustomOverlay}
+            matchId={matchId}
+            setMatchId={setMatchId}
+            teamATheme={teamATheme}
+            setTeamATheme={setTeamATheme}
+            teamBTheme={teamBTheme}
+            setTeamBTheme={setTeamBTheme}
+            teamAPalette={teamAPalette}
+            teamBPalette={teamBPalette}
+            matchDetails={matchDetails}
+            eventDetails={eventDetails}
+            isLoadingDetails={isLoadingDetails}
+            detailsError={detailsError}
+            trimmedMatchId={trimmedMatchId}
+            hasMatchId={hasMatchId}
+            configLocked={configLocked}
+            canInitialize={canInitialize}
+            canPreview={canPreview}
+            showControl={showControl}
+            overlayPreviewUrl={overlayPreviewUrl}
+            handleInitialize={handleInitialize}
+            handleUnlock={handleUnlock}
+            teamALogo={teamALogo}
+            setTeamALogo={setTeamALogo}
+            teamBLogo={teamBLogo}
+            setTeamBLogo={setTeamBLogo}
+            eventLogo={eventLogo}
+            setEventLogo={setEventLogo}
+          />
         ) : null}
 
         {isControlView ? (
-          <section className="overlay-section">
-            {showControl ? (
-              <div className="overlay-control-layout">
-                <div className="overlay-control-stack">
-                  <Card className="overlay-card overlay-banner-card">
-                    <SectionHeader
-                      title="Banners"
-                      description="Trigger on-air banners that slide behind the score bar."
-                      divider
-                    />
-
-                    <div className="overlay-banner-grid">
-                      <div className="overlay-banner-block">
-                        <div className="overlay-banner-block__title">Break chance</div>
-                        <label className="overlay-manual-toggle">
-                          <input
-                            type="checkbox"
-                            checked={breakChanceEnabled}
-                            onChange={(event) => setBreakChanceEnabled(event.target.checked)}
-                          />
-                          <div>
-                            <div className="overlay-manual-toggle__title">Break chance banner</div>
-                            <div className="overlay-manual-toggle__hint">
-                              Show when the base-possession team regains possession.
-                            </div>
-                          </div>
-                        </label>
-                      </div>
-
-                      <div className="overlay-banner-block">
-                        <div className="overlay-banner-block__header">
-                          <div className="overlay-banner-block__title">Player stats</div>
-                          {renderAutoFadeToggle(playerStatsAutoFade, setPlayerStatsAutoFade)}
-                        </div>
-                        <Field
-                          label="Player stats banner"
-                          hint="Choose a player to trigger the banner."
-                        >
-                          <Select
-                            value={bannerPlayerId}
-                            onChange={(event) => setBannerPlayerId(event.target.value)}
-                          >
-                            <option value="">Select player</option>
-                            {bannerPlayerOptions.map((player) => (
-                              <option key={player.id || `${player.name}-${player.number || "na"}`} value={player.id}>
-                                {Number.isFinite(Number(player.number)) ? `#${player.number} ` : ""}
-                                {player.name}
-                              </option>
-                            ))}
-                          </Select>
-                        </Field>
-                        <button
-                          type="button"
-                          className={`sc-button ${selectedBannerPlayer ? "" : "is-disabled"}`}
-                          onClick={handleTriggerBanner}
-                          disabled={!selectedBannerPlayer}
-                        >
-                          {formatTimedButtonLabel("Show player stats banner", BUTTON_DURATION_SECONDS.playerStats)}
-                        </button>
-                      </div>
-
-                      <div className="overlay-banner-block">
-                        <div className="overlay-banner-block__header">
-                          <div className="overlay-banner-block__title">Match stats</div>
-                          {renderAutoFadeToggle(matchStatsAutoFade, setMatchStatsAutoFade)}
-                        </div>
-                        <div className="overlay-matchstats-table">
-                          <table className="overlay-matchstats-table__grid">
-                            <thead>
-                              <tr>
-                                <th>{matchDetails?.team_a?.name || "Team A"}</th>
-                                <th></th>
-                                <th>{matchDetails?.team_b?.name || "Team B"}</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              <tr>
-                                <td>{formatStatValue(matchStats?.scoreA)}</td>
-                                <td>Score</td>
-                                <td>{formatStatValue(matchStats?.scoreB)}</td>
-                              </tr>
-                              <tr>
-                                <td>{formatStatValue(matchStats?.holdsA)}</td>
-                                <td>Holds</td>
-                                <td>{formatStatValue(matchStats?.holdsB)}</td>
-                              </tr>
-                              <tr>
-                                <td>{formatStatValue(matchStats?.breaksA)}</td>
-                                <td>Breaks</td>
-                                <td>{formatStatValue(matchStats?.breaksB)}</td>
-                              </tr>
-                              <tr>
-                                <td>{formatStatValue(matchStats?.turnoversA)}</td>
-                                <td>Turnovers</td>
-                                <td>{formatStatValue(matchStats?.turnoversB)}</td>
-                              </tr>
-                              <tr>
-                                <td>{formatStatValue(matchStats?.blocksA)}</td>
-                                <td>Blocks</td>
-                                <td>{formatStatValue(matchStats?.blocksB)}</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                        <button type="button" className="sc-button is-ghost" onClick={handleTriggerMatchStats}>
-                          {formatTimedButtonLabel("Show match stats overlay", BUTTON_DURATION_SECONDS.matchStats)}
-                        </button>
-                      </div>
-
-                      <div className="overlay-banner-block">
-                        <div className="overlay-banner-block__header">
-                          <div className="overlay-banner-block__title">Timeouts</div>
-                          {renderAutoFadeToggle(timeoutAutoFade, setTimeoutAutoFade)}
-                        </div>
-                        <div className="overlay-banner-actions">
-                          <button
-                            type="button"
-                            className="sc-button is-ghost"
-                            onClick={() => handleTriggerTimeout("A")}
-                          >
-                            {formatTimedButtonLabel(
-                              `Timeout ${matchDetails?.team_a?.name || "Team A"}`,
-                              BUTTON_DURATION_SECONDS.timeout,
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            className="sc-button is-ghost"
-                            onClick={() => handleTriggerTimeout("B")}
-                          >
-                            {formatTimedButtonLabel(
-                              `Timeout ${matchDetails?.team_b?.name || "Team B"}`,
-                              BUTTON_DURATION_SECONDS.timeout,
-                            )}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="overlay-banner-block">
-                        <div className="overlay-banner-block__header">
-                          <div className="overlay-banner-block__title">Halftime + stoppage</div>
-                          {renderAutoFadeToggle(matchEventAutoFade, setMatchEventAutoFade)}
-                        </div>
-                        <div className="overlay-banner-actions">
-                          <button
-                            type="button"
-                            className={`sc-button is-ghost ${bannerEventGroups.halftimeEvent ? "" : "is-disabled"}`}
-                            disabled={!bannerEventGroups.halftimeEvent}
-                            onClick={() => handleTriggerMatchEvent(bannerEventGroups.halftimeEvent)}
-                          >
-                            Halftime
-                          </button>
-                          <button
-                            type="button"
-                            className={`sc-button is-ghost ${bannerEventGroups.stoppage.length ? "" : "is-disabled"}`}
-                            disabled={!bannerEventGroups.stoppage.length}
-                            onClick={() => handleTriggerMatchEvent(bannerEventGroups.stoppage[0])}
-                          >
-                            Stoppage
-                          </button>
-                        </div>
-                        {matchEventError ? (
-                          <p className="overlay-banner-status overlay-banner-status--error">{matchEventError}</p>
-                        ) : null}
-                      </div>
-
-                      <div className="overlay-banner-block">
-                        <div className="overlay-banner-block__header">
-                          <div className="overlay-banner-block__title">Field calls</div>
-                          {renderAutoFadeToggle(fieldCallAutoFade, setFieldCallAutoFade)}
-                        </div>
-                        <div className="overlay-banner-actions">
-                          {FIELD_CALL_OPTIONS.map((callLabel) => (
-                            <button
-                              key={callLabel}
-                              type="button"
-                              className="sc-button is-ghost"
-                              onClick={() => handleTriggerFieldCall(callLabel)}
-                            >
-                              {formatTimedButtonLabel(callLabel, BUTTON_DURATION_SECONDS.fieldCall)}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {bannerStatus ? (
-                        <p className="overlay-banner-status">{bannerStatus}</p>
-                      ) : null}
-                    </div>
-                  </Card>
-
-                  <Card className="overlay-card overlay-roster-card">
-                    <SectionHeader
-                      title="Team rosters"
-                      description="Players loaded for the active event."
-                      action={
-                        <>
-                          <button type="button" className="sc-button is-ghost" onClick={handleTriggerTeamRosters}>
-                            {formatTimedButtonLabel("Show overlay", BUTTON_DURATION_SECONDS.teamRosters)}
-                          </button>
-                          <Chip variant="ghost">{teamARoster.length + teamBRoster.length} players</Chip>
-                        </>
-                      }
-                      divider
-                    />
-
-                    {isLoadingRoster ? (
-                      <p className="overlay-data-state">Loading team roster...</p>
-                    ) : rosterError ? (
-                      <p className="overlay-data-state overlay-data-state--error">{rosterError}</p>
-                    ) : teamARoster.length || teamBRoster.length ? (
-                      <div className="overlay-roster-stack">
-                        <div className="overlay-roster-grid">
-                          <div>
-                            <div className="overlay-roster-title">{matchDetails?.team_a?.name || "Team A"}</div>
-                            <ul className="overlay-roster-list">
-                              {teamARoster.length ? (
-                                teamARoster.map((player, index) => (
-                                  <li className="overlay-roster-item" key={`team-a-${index}`}>
-                                    <span className="overlay-roster-identity">
-                                      {player.isCaptain ? (
-                                        <span className="overlay-roster-tag overlay-roster-tag--captain" aria-label="Captain">
-                                          C
-                                        </span>
-                                      ) : null}
-                                      {player.isSpiritCaptain ? (
-                                        <span
-                                          className="overlay-roster-tag overlay-roster-tag--spirit"
-                                          aria-label="Spirit captain"
-                                        >
-                                          SC
-                                        </span>
-                                      ) : null}
-                                      <span className="overlay-roster-name">{player.name}</span>
-                                      <span className="overlay-roster-number">
-                                        {Number.isFinite(Number(player.number)) ? player.number : " "}
-                                      </span>
-                                    </span>
-                                  </li>
-                                ))
-                              ) : (
-                                <li className="overlay-roster-empty">No players loaded.</li>
-                              )}
-                            </ul>
-                          </div>
-                          <div>
-                            <div className="overlay-roster-title">{matchDetails?.team_b?.name || "Team B"}</div>
-                            <ul className="overlay-roster-list">
-                              {teamBRoster.length ? (
-                                teamBRoster.map((player, index) => (
-                                  <li className="overlay-roster-item" key={`team-b-${index}`}>
-                                    <span className="overlay-roster-identity">
-                                      {player.isCaptain ? (
-                                        <span className="overlay-roster-tag overlay-roster-tag--captain" aria-label="Captain">
-                                          C
-                                        </span>
-                                      ) : null}
-                                      {player.isSpiritCaptain ? (
-                                        <span
-                                          className="overlay-roster-tag overlay-roster-tag--spirit"
-                                          aria-label="Spirit captain"
-                                        >
-                                          SC
-                                        </span>
-                                      ) : null}
-                                      <span className="overlay-roster-name">{player.name}</span>
-                                      <span className="overlay-roster-number">
-                                        {Number.isFinite(Number(player.number)) ? player.number : " "}
-                                      </span>
-                                    </span>
-                                  </li>
-                                ))
-                              ) : (
-                                <li className="overlay-roster-empty">No players loaded.</li>
-                              )}
-                            </ul>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="overlay-data-state">No roster data available.</p>
-                    )}
-                  </Card>
-
-                  <Card className="overlay-card overlay-rules-card">
-                    <SectionHeader
-                      title="Rules"
-                      description="Event details and rules."
-                      divider
-                    />
-
-                    {isLoadingDetails ? (
-                      <p className="overlay-data-state">Loading event details...</p>
-                    ) : detailsError ? (
-                      <p className="overlay-data-state overlay-data-state--error">{detailsError}</p>
-                    ) : eventDetails ? (
-                      <div className="overlay-data-body">
-                        <dl className="overlay-definition-list">
-                          <div className="overlay-definition-item">
-                            <dt>Event ID</dt>
-                            <dd>{eventDetails.id}</dd>
-                          </div>
-                          <div className="overlay-definition-item">
-                            <dt>Name</dt>
-                            <dd>{eventDetails.name || "--"}</dd>
-                          </div>
-                          <div className="overlay-definition-item">
-                            <dt>Type</dt>
-                            <dd>{eventDetails.type || "--"}</dd>
-                          </div>
-                          <div className="overlay-definition-item">
-                            <dt>Status</dt>
-                            <dd>{eventDetails.Status || "--"}</dd>
-                          </div>
-                          <div className="overlay-definition-item">
-                            <dt>Start date</dt>
-                            <dd>{formatDate(eventDetails.start_date)}</dd>
-                          </div>
-                          <div className="overlay-definition-item">
-                            <dt>End date</dt>
-                            <dd>{formatDate(eventDetails.end_date)}</dd>
-                          </div>
-                          <div className="overlay-definition-item">
-                            <dt>Location</dt>
-                            <dd>{eventDetails.location || "--"}</dd>
-                          </div>
-                        </dl>
-
-                        <div className="overlay-rules">
-                          <div className="overlay-rules-header">Rules</div>
-                          <div className="overlay-rules-body">
-                            {eventDetails.rules ? (
-                              renderRulesValue(eventDetails.rules, "rules")
-                            ) : (
-                              <span className="rules-empty">No rules provided</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="overlay-data-state">No event data available.</p>
-                    )}
-                  </Card>
-                </div>
-
-                <Card className="overlay-card overlay-log-card">
-                  <SectionHeader
-                    title="Match log"
-                    description="Realtime feed of match events."
-                    action={<Chip variant="ghost">{matchLogs.length} entries</Chip>}
-                    divider
-                  />
-
-                  {isLoadingLogs ? (
-                    <p className="overlay-data-state">Loading match logs...</p>
-                  ) : logsError ? (
-                    <p className="overlay-data-state overlay-data-state--error">{logsError}</p>
-                  ) : eventCardLogs.length ? (
-                    <div className="overlay-log-list">
-                      {eventCardLogs.map((log, index) => (
-                        <MatchEventCard
-                          key={log.id}
-                          log={log}
-                          chronologicalIndex={index}
-                          editIndex={index}
-                          displayTeamA={matchDetails?.team_a?.name || "Team A"}
-                          displayTeamB={matchDetails?.team_b?.name || "Team B"}
-                          displayTeamAShort={matchDetails?.team_a?.name || "Team A"}
-                          displayTeamBShort={matchDetails?.team_b?.name || "Team B"}
-                          openScoreModal={noop}
-                          openSimpleEventModal={noop}
-                          openPossessionEditModal={noop}
-                          editLocation="none"
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="overlay-data-state">No match logs yet.</p>
-                  )}
-                </Card>
-              </div>
-            ) : (
-              <Card className="overlay-card overlay-control-locked">
-                <p className="overlay-data-state">
-                  Initialize the configuration to unlock overlay controls, rules, and match logs.
-                </p>
-              </Card>
-            )}
-          </section>
+          <ControlView
+            overlayUrl={overlayUrl}
+            canPreview={canPreview}
+            copied={copied}
+            handleCopy={handleCopy}
+            showControl={showControl}
+            matchDetails={matchDetails}
+            eventDetails={eventDetails}
+            matchLogs={matchLogs}
+            eventCardLogs={eventCardLogs}
+            isLoadingDetails={isLoadingDetails}
+            isLoadingLogs={isLoadingLogs}
+            isLoadingRoster={isLoadingRoster}
+            detailsError={detailsError}
+            logsError={logsError}
+            rosterError={rosterError}
+            rosterByTeam={rosterByTeam}
+            breakChanceEnabled={breakChanceEnabled}
+            setBreakChanceEnabled={setBreakChanceEnabled}
+            bannerPlayerId={bannerPlayerId}
+            setBannerPlayerId={setBannerPlayerId}
+            bannerStatus={bannerStatus}
+            bannerPlayerOptions={bannerPlayerOptions}
+            selectedBannerPlayer={selectedBannerPlayer}
+            matchStats={matchStats}
+            matchEventButtons={matchEventButtons}
+            matchEventError={matchEventError}
+            playerStatsAutoFade={playerStatsAutoFade}
+            setPlayerStatsAutoFade={setPlayerStatsAutoFade}
+            matchStatsAutoFade={matchStatsAutoFade}
+            setMatchStatsAutoFade={setMatchStatsAutoFade}
+            timeoutAutoFade={timeoutAutoFade}
+            setTimeoutAutoFade={setTimeoutAutoFade}
+            matchEventAutoFade={matchEventAutoFade}
+            setMatchEventAutoFade={setMatchEventAutoFade}
+            fieldCallAutoFade={fieldCallAutoFade}
+            setFieldCallAutoFade={setFieldCallAutoFade}
+            handleTriggerBanner={handleTriggerBanner}
+            handleTriggerMatchStats={handleTriggerMatchStats}
+            handleTriggerTeamRosters={handleTriggerTeamRosters}
+            handleTriggerBreakChance={handleTriggerBreakChance}
+            handleTestBreakChance={handleTestBreakChance}
+            handleTriggerTimeout={handleTriggerTimeout}
+            handleTriggerMatchEvent={handleTriggerMatchEvent}
+            handleTriggerFieldCall={handleTriggerFieldCall}
+          />
         ) : null}
       </SectionShell>
     </div>

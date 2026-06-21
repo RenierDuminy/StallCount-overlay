@@ -543,6 +543,13 @@ select.sc-input {
   background-size: 6px 6px, 6px 6px;
   background-repeat: no-repeat;
   padding-right: 2.5rem;
+  border: 1px solid #000000;
+}
+
+select.sc-input option {
+  background-color: #0a1916;
+  color: #e8f4ed;
+  border-bottom: 1px solid rgba(99, 255, 160, 0.12);
 }
 
 textarea.sc-input {

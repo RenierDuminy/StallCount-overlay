@@ -362,6 +362,7 @@ body.overlay-fixed .overlay-event {
   background: var(--banner-surface-bg);
   color: var(--banner-surface-text);
   border: 1px solid var(--banner-border-color);
+  border-radius: 0;
   box-shadow: 0 10px 22px var(--banner-shadow-color, rgba(15, 23, 42, 0.12));
   transform: translate(-50%, 120%);
   opacity: 0;
@@ -627,6 +628,7 @@ body.overlay-fixed .overlay-event {
   padding: 12px 16px;
   background: var(--banner-team-bg);
   color: var(--banner-team-text);
+  border-radius: 0;
   height: 64px;
 }
 
@@ -658,6 +660,7 @@ body.overlay-fixed .overlay-event {
   color: var(--banner-surface-text);
   font-family: "Space Grotesk", var(--sc-font-body), sans-serif;
   border-left: 1px solid var(--banner-border-color);
+  border-radius: 0;
 }
 
 .overlay-banner.is-team-b .banner-stats {

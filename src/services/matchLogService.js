@@ -13,3 +13,6 @@
   STOPPAGE_END: "stoppage_end",
   BLOCK: "block",
 };
+
+// Numeric ID of the "block" row in match_events — verify if schema changes.
+export const BLOCK_EVENT_TYPE_ID = 19;

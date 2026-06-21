@@ -53,6 +53,8 @@ const elements = {
   scoreB: document.getElementById("scoreB"),
   breakChanceBannerA: document.getElementById("breakChanceBannerA"),
   breakChanceBannerB: document.getElementById("breakChanceBannerB"),
+  breakChancePopup: document.getElementById("breakChancePopup"),
+  breakChancePopupTeam: document.getElementById("breakChancePopupTeam"),
   meta: document.getElementById("meta"),
   banner: document.getElementById("overlayBanner"),
   bannerPlayerName: document.getElementById("bannerPlayerName"),
@@ -107,11 +109,14 @@ if (isPreview) {
 
 const eventCache = new Map();
 const matchEventTypes = new Map();
+const resolvedEventCodeCache = new Map();
 let matchEventTypesLoaded = false;
 let currentEvent = null;
 let currentEventRules = null;
 let matchLogs = [];
 const matchLogById = new Map();
+let stoppageActive = false;
+let cachedBreakChanceState = { isActive: false, teamId: null };
 let clockInterval = null;
 let bannerTimeout = null;
 let timeoutTimeout = null;
@@ -135,6 +140,7 @@ function getOverlayPayloadKey(payload) {
   if (payload.type === "playerStats") return `playerStats:${payload.playerId || payload.playerName || ""}`;
   if (payload.type === "matchStats") return "matchStats";
   if (payload.type === "teamRosters") return "teamRosters";
+  if (payload.type === "breakChance") return `breakChance:${(payload.team || "").toString().trim().toUpperCase()}`;
   if (payload.type === "timeout") return `timeout:${(payload.team || "").toString().trim().toUpperCase()}`;
   if (payload.type === "fieldCall") return `fieldCall:${(payload.callLabel || "").toString().trim().toUpperCase()}`;
   if (payload.type === "matchEvent") {
@@ -154,6 +160,13 @@ function handleOverlayBannerPayload(payload) {
   }
   if (payload?.type === "teamRosters") {
     showTeamRostersBanner(payload);
+    return;
+  }
+  if (payload?.type === "breakChance") {
+    const team = (payload.team || "").toString().trim().toUpperCase();
+    if (team === "A" || team === "B") {
+      showBreakChanceBanner(team, payload);
+    }
     return;
   }
   if (payload?.type === "timeout") {
@@ -461,6 +474,9 @@ const STATUS_LABELS = {
 };
 
 function resolveEventCode(eventType) {
+  if (eventType?.id !== undefined && resolvedEventCodeCache.has(eventType.id)) {
+    return resolvedEventCodeCache.get(eventType.id);
+  }
   const rawCode = (eventType?.code || "").toString().trim().toLowerCase();
   if (rawCode) {
     const normalizedCode = rawCode.replace(/\s+/g, "_");
@@ -517,8 +533,7 @@ function resolveOpposingTeamId(teamId, match) {
   return null;
 }
 
-function deriveBreakChanceState(match) {
-  if (!breakChanceEnabled) return { isActive: false, teamId: null };
+function computeBreakChanceState(match) {
   const targetMatch = match || currentMatch;
   if (!targetMatch) return { isActive: false, teamId: null };
   const timeline = getMatchLogTimeline();
@@ -565,6 +580,25 @@ function deriveBreakChanceState(match) {
 
   const isActive = Boolean(baseTeamId && possessionTeamId && baseTeamId === possessionTeamId);
   return { isActive, teamId: isActive ? baseTeamId : null };
+}
+
+function recomputeIncrementalState(match) {
+  let active = false;
+  getMatchLogTimeline().forEach((log) => {
+    const eventType = log?.eventType || matchEventTypes.get(log?.event_type_id);
+    const eventCode = resolveEventCode(eventType);
+    if (eventCode === MATCH_LOG_EVENT_CODES.STOPPAGE_START) active = true;
+    if (eventCode === MATCH_LOG_EVENT_CODES.STOPPAGE_END) active = false;
+  });
+  stoppageActive = active;
+  cachedBreakChanceState = breakChanceEnabled
+    ? computeBreakChanceState(match)
+    : { isActive: false, teamId: null };
+}
+
+function deriveBreakChanceState(match) {
+  if (!breakChanceEnabled) return { isActive: false, teamId: null };
+  return cachedBreakChanceState;
 }
 
 function formatSeconds(seconds) {
@@ -713,6 +747,7 @@ function refreshClockInterval(clockInfo) {
 
 function updateBreakChanceBanner(match) {
   if (!elements.breakChanceBannerA && !elements.breakChanceBannerB) return;
+  if (activeBreakChanceKey) return;
   if (!breakChanceEnabled) {
     elements.breakChanceBannerA?.classList.remove("is-active");
     elements.breakChanceBannerB?.classList.remove("is-active");
@@ -829,6 +864,7 @@ async function loadMatchEventTypesOnce() {
 
   data.forEach((eventType) => {
     matchEventTypes.set(eventType.id, eventType);
+    resolvedEventCodeCache.set(eventType.id, resolveEventCode(eventType));
   });
   return matchEventTypes;
 }
@@ -866,6 +902,7 @@ function hydrateStoredMatchLogs() {
       matchLogById.set(log.id, log);
     }
   });
+  recomputeIncrementalState(currentMatch);
 }
 
 async function loadMatchLogsSnapshot() {
@@ -951,7 +988,8 @@ function updateOverlay(match, scoreboard) {
     manualClockValue ||
     derivedClock ||
     (hideClock ? "" : formatClock(scoreboard?.clock));
-  const logo = scoreboard?.eventLogo || scoreboard?.logo || DEFAULT_LOGO_SRC;
+  const customEventLogo = (() => { try { return localStorage.getItem("stallcount:logo-event") || ""; } catch { return ""; } })();
+  const logo = scoreboard?.eventLogo || scoreboard?.logo || customEventLogo || DEFAULT_LOGO_SRC;
 
   if (elements.eventName) elements.eventName.textContent = eventName;
   if (elements.logoFallback) elements.logoFallback.textContent = getInitials(eventName);
@@ -1107,7 +1145,7 @@ function renderRosterList(element, players) {
 
     const number = document.createElement("span");
     number.className = "roster-banner-number";
-    number.textContent = Number.isFinite(Number(player.number)) ? `#${player.number}` : "";
+    number.textContent = (player.number != null && Number.isFinite(Number(player.number))) ? `#${player.number}` : "";
 
     identity.append(name, number);
     item.append(identity);
@@ -1230,6 +1268,76 @@ function showTeamRostersBanner(payload) {
     activeTeamRostersKey = null;
     teamRostersTimeout = null;
   }, 10000);
+}
+
+let activeBreakChanceKey = null;
+let breakChanceTimeout = null;
+
+function showBreakChanceBanner(team, payload = null) {
+  const target =
+    team === "A" ? elements.breakChanceBannerA : team === "B" ? elements.breakChanceBannerB : null;
+  if (!target) return;
+  const payloadKey = getOverlayPayloadKey(payload || { type: "breakChance", team });
+  const autoFade = isAutoFadeEnabled(payload);
+
+  if (!autoFade && activeBreakChanceKey === payloadKey && target.classList.contains("is-active")) {
+    target.classList.remove("is-active");
+    target.classList.remove("is-persistent");
+    if (elements.breakChancePopup) {
+      elements.breakChancePopup.classList.remove("is-active");
+      elements.breakChancePopup.classList.remove("is-persistent");
+    }
+    activeBreakChanceKey = null;
+    if (breakChanceTimeout) {
+      window.clearTimeout(breakChanceTimeout);
+      breakChanceTimeout = null;
+    }
+    return;
+  }
+
+  // Set popup team label + colours from match data if available
+  if (elements.breakChancePopup && elements.breakChancePopupTeam) {
+    const teamName = team === "A"
+      ? (currentMatch?.team_a?.name || "Team A")
+      : (currentMatch?.team_b?.name || "Team B");
+    elements.breakChancePopupTeam.textContent = teamName;
+    const teamBg = team === "A"
+      ? (currentMatch?.team_a?.primary_colour || "#1f2933")
+      : (currentMatch?.team_b?.primary_colour || "#1f2933");
+    const teamText = team === "A"
+      ? (currentMatch?.team_a?.text_colour || "#ffffff")
+      : (currentMatch?.team_b?.text_colour || "#ffffff");
+    elements.breakChancePopup.style.setProperty("--bc-team-bg", teamBg);
+    elements.breakChancePopup.style.setProperty("--bc-team-text", teamText);
+    elements.breakChancePopup.classList.remove("is-active");
+    elements.breakChancePopup.classList.remove("is-persistent");
+    void elements.breakChancePopup.offsetWidth;
+  }
+
+  target.classList.remove("is-active");
+  target.classList.remove("is-persistent");
+  void target.offsetWidth;
+  target.classList.add("is-active");
+  if (elements.breakChancePopup) elements.breakChancePopup.classList.add("is-active");
+  activeBreakChanceKey = payloadKey;
+
+  if (breakChanceTimeout) {
+    window.clearTimeout(breakChanceTimeout);
+    breakChanceTimeout = null;
+  }
+  if (autoFade) {
+    breakChanceTimeout = window.setTimeout(() => {
+      target?.classList.remove("is-active");
+      target?.classList.remove("is-persistent");
+      elements.breakChancePopup?.classList.remove("is-active");
+      elements.breakChancePopup?.classList.remove("is-persistent");
+      activeBreakChanceKey = null;
+      breakChanceTimeout = null;
+    }, 4200);
+  } else {
+    target.classList.add("is-persistent");
+    if (elements.breakChancePopup) elements.breakChancePopup.classList.add("is-persistent");
+  }
 }
 
 function showTimeoutBanner(team, payload = null) {
@@ -1379,21 +1487,11 @@ function showMatchEventBanner(payload) {
 }
 
 function isStoppageActive() {
-  let active = false;
-  getMatchLogTimeline().forEach((log) => {
-    const eventType = log?.eventType || matchEventTypes.get(log?.event_type_id);
-    const eventCode = resolveEventCode(eventType);
-    if (eventCode === MATCH_LOG_EVENT_CODES.STOPPAGE_START) {
-      active = true;
-    }
-    if (eventCode === MATCH_LOG_EVENT_CODES.STOPPAGE_END) {
-      active = false;
-    }
-  });
-  return active;
+  return stoppageActive;
 }
 
 function syncStoppageBanner() {
+  recomputeIncrementalState(currentMatch);
   if (isStoppageActive()) {
     showMatchEventBanner({
       type: "matchEvent",
@@ -1627,6 +1725,16 @@ if (matchId) {
   });
 }
 
+const VALID_OVERLAY_PAYLOAD_TYPES = new Set([
+  "playerStats",
+  "matchStats",
+  "teamRosters",
+  "breakChance",
+  "timeout",
+  "fieldCall",
+  "matchEvent",
+]);
+
 window.addEventListener("storage", (event) => {
   if (event.key === APP_SETTINGS_STORAGE_KEY) {
     overlayInitialized = getOverlayInitialized();
@@ -1640,6 +1748,8 @@ window.addEventListener("storage", (event) => {
   if (!event.newValue) return;
   try {
     const payload = JSON.parse(event.newValue);
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return;
+    if (!VALID_OVERLAY_PAYLOAD_TYPES.has(payload.type)) return;
     handleOverlayBannerPayload(payload);
   } catch (error) {
     // ignore malformed payloads

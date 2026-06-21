@@ -1,6 +1,4 @@
-import { MATCH_LOG_EVENT_CODES } from "../../services/matchLogService";
-
-const BLOCK_EVENT_TYPE_ID = 19;
+import { BLOCK_EVENT_TYPE_ID, MATCH_LOG_EVENT_CODES } from "../../services/matchLogService";
 const TEXT_SIZES = {
   s: "text-xs",
   m: "text-sm",
