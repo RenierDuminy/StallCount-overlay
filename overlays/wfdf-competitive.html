@@ -33,8 +33,15 @@
 
       #canvas .overlay-root {
         transform: none;
+        position: relative;
+        z-index: 2;
       }
     </style>
+    <script>
+      document.head.insertAdjacentHTML('beforeend', '<style>' +
+        '#canvas{outline:1px solid rgba(255,255,255,0.4);background-image:repeating-linear-gradient(45deg,rgba(255,255,255,0.03) 0px,rgba(255,255,255,0.03) 1px,transparent 1px,transparent 12px),repeating-linear-gradient(-45deg,rgba(255,255,255,0.03) 0px,rgba(255,255,255,0.03) 1px,transparent 1px,transparent 12px)}' +
+      '</style>');
+    </script>
   </head>
   <body class="overlay-fixed">
     <div id="viewport">
@@ -42,7 +49,7 @@
         <div class="overlay-root">
           <div class="overlay-bar" id="overlayBar">
             <div class="overlay-logo">
-              <img id="eventLogo" alt="League logo" src="./stallcount-logo.png" />
+              <img id="eventLogo" alt="League logo" src="../stallcount-logo.png" />
               <span class="overlay-logo-fallback" id="eventLogoFallback">SC</span>
             </div>
 
@@ -51,11 +58,11 @@
               <div class="team-scorebox">
                 <span class="team-score" id="scoreA">0</span>
               </div>
-              <div class="overlay-break-chance" id="breakChanceBannerA" aria-live="polite">
-                <span class="timeout-label">BREAK CHANCE</span>
-              </div>
               <div class="overlay-timeout overlay-timeout--team-a" id="timeoutBannerA" aria-live="polite">
                 <span class="timeout-label">TIMEOUT</span>
+              </div>
+              <div class="overlay-break-chance overlay-break-chance--team-a" id="breakChanceBannerA" aria-live="polite">
+                <span class="break-chance-label">BREAK CHANCE</span>
               </div>
             </div>
 
@@ -64,11 +71,11 @@
               <div class="team-scorebox">
                 <span class="team-score team-score--away" id="scoreB">0</span>
               </div>
-              <div class="overlay-break-chance" id="breakChanceBannerB" aria-live="polite">
-                <span class="timeout-label">BREAK CHANCE</span>
-              </div>
               <div class="overlay-timeout overlay-timeout--team-b" id="timeoutBannerB" aria-live="polite">
                 <span class="timeout-label">TIMEOUT</span>
+              </div>
+              <div class="overlay-break-chance overlay-break-chance--team-b" id="breakChanceBannerB" aria-live="polite">
+                <span class="break-chance-label">BREAK CHANCE</span>
               </div>
             </div>
 
@@ -183,6 +190,6 @@
       window.addEventListener("resize", scaleCanvas);
       scaleCanvas();
     </script>
-    <script type="module" src="./src/overlay-entry.js"></script>
+    <script type="module" src="../src/overlays/wfdf-competitive.js"></script>
   </body>
 </html>

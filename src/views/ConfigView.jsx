@@ -1,21 +1,22 @@
 import { Field, Input, Select } from "../components/ui/primitives";
 
 const OVERLAY_OPTIONS = [
-  { value: "overlay-wfdf-competitive.html", label: "WFDF competitive", hasEventLogo: true },
-  { value: "overlay-corner-box.html", label: "Corner box", hasTeamLogos: true },
-  { value: "overlay-wide-bar.html", label: "Wide bar", hasTeamLogos: true },
-  { value: "overlay-badge-centre.html", label: "Badge centre", hasTeamLogos: true },
-  { value: "overlay-top-right-list.html", label: "Top-right list" },
-  { value: "overlay-two-row.html", label: "Two-row" },
-  { value: "overlay-compact-bar.html", label: "Compact bar", hasTeamLogos: true },
-  { value: "custom", label: "Custom file…", hasTeamLogos: true },
+  { value: "overlays/badge-centre.html", label: "Badge centre", hasTeamLogos: true },
+  { value: "overlays/compact-bar.html", label: "Compact bar", hasTeamLogos: true },
+  { value: "overlays/corner-box-bottom-left.html", label: "Corner box (Bottom-L)", hasTeamLogos: true },
+  { value: "overlays/corner-box.html", label: "Corner box (Top-L)", hasTeamLogos: true },
+  { value: "overlays/top-right-list.html", label: "Top-right list" },
+  { value: "overlays/wfdf-competitive.html", label: "WFDF competitive", hasEventLogo: true },
+  { value: "overlays/wide-bar.html", label: "Wide bar", hasTeamLogos: true },
+  { value: "overlay-debug.html", label: "Debug", hasEventLogo: true },
 ];
+
 
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(reader.error);
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = () => reject(new Error("Failed to read file"));
     reader.readAsDataURL(file);
   });
 }
@@ -30,8 +31,6 @@ function formatDateTime(value) {
 export function ConfigView({
   overlayChoice,
   setOverlayChoice,
-  customOverlay,
-  setCustomOverlay,
   matchId,
   setMatchId,
   teamATheme,
@@ -113,23 +112,6 @@ export function ConfigView({
                 ))}
               </Select>
             </Field>
-
-            {overlayChoice === "custom" ? (
-              <Field label="Custom file">
-                <Input
-                  type="file"
-                  accept=".html,.htm,text/html"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    setCustomOverlay(file ? file.name : "");
-                  }}
-                  disabled={configLocked}
-                />
-                {customOverlay ? (
-                  <p className="overlay-option-note">{customOverlay}</p>
-                ) : null}
-              </Field>
-            ) : null}
 
             <Field label="Match ID" action={hasMatchId ? "✓" : null}>
               <Input

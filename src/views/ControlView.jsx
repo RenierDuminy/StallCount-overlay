@@ -1,29 +1,39 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { Card, Chip, Field, Select, SectionHeader } from "../components/ui/primitives";
 import { MatchEventCard } from "../components/eventCards";
 import { MATCH_LOG_EVENT_CODES } from "../services/matchLogService";
 
-function TimedButton({ children, onClick, durationSeconds, disabled, className = "" }) {
+function TimedButton({ children, onClick, durationSeconds, disabled, autoFade = true, className = "" }) {
   const [animKey, setAnimKey] = useState(0);
   const [running, setRunning] = useState(false);
+  const [latched, setLatched] = useState(false);
+
+  useEffect(() => {
+    if (autoFade && latched) setLatched(false);
+  }, [autoFade]);
 
   const handleClick = useCallback(() => {
     if (disabled) return;
+    if (!autoFade) {
+      setLatched((prev) => !prev);
+      if (!latched) onClick?.();
+      return;
+    }
     setAnimKey((k) => k + 1);
     setRunning(true);
     onClick?.();
-  }, [disabled, onClick]);
+  }, [disabled, autoFade, latched, onClick]);
 
   const handleAnimationEnd = useCallback(() => {
     setRunning(false);
   }, []);
 
-  const hasDuration = Number.isFinite(durationSeconds) && durationSeconds > 0;
+  const hasDuration = autoFade && Number.isFinite(durationSeconds) && durationSeconds > 0;
 
   return (
     <button
       type="button"
-      className={`sc-timed-btn ${running ? "is-running" : ""} ${disabled ? "is-disabled" : ""} ${className}`}
+      className={`sc-timed-btn ${running ? "is-running" : ""} ${latched ? "is-latched" : ""} ${disabled ? "is-disabled" : ""} ${className}`}
       onClick={handleClick}
       disabled={disabled}
     >
@@ -47,6 +57,8 @@ const BUTTON_DURATION_SECONDS = {
   teamRosters: 10,
   timeout: 4,
   fieldCall: 4,
+  matchEvent: 5,
+  breakChance: 4,
 };
 const FIELD_CALL_OPTIONS = ["Pick", "Violation", "Foul", "Injury"];
 
@@ -132,8 +144,6 @@ export function ControlView({
   logsError,
   rosterError,
   rosterByTeam,
-  breakChanceEnabled,
-  setBreakChanceEnabled,
   bannerPlayerId,
   setBannerPlayerId,
   bannerStatus,
@@ -152,14 +162,17 @@ export function ControlView({
   setMatchEventAutoFade,
   fieldCallAutoFade,
   setFieldCallAutoFade,
+  teamRostersAutoFade,
+  setTeamRostersAutoFade,
+  breakChanceEnabled,
+  setBreakChanceEnabled,
   handleTriggerBanner,
   handleTriggerMatchStats,
   handleTriggerTeamRosters,
-  handleTriggerBreakChance,
-  handleTestBreakChance,
   handleTriggerTimeout,
   handleTriggerMatchEvent,
   handleTriggerFieldCall,
+  handleTriggerBreakChance,
 }) {
   const teamARoster = rosterByTeam[matchDetails?.team_a?.id] || [];
   const teamBRoster = rosterByTeam[matchDetails?.team_b?.id] || [];
@@ -234,29 +247,6 @@ export function ControlView({
 
                 <div className="overlay-banner-grid">
                   <div className="overlay-banner-block">
-                    <div className="overlay-banner-block__title">Break chance</div>
-                    <label className="overlay-manual-toggle">
-                      <input
-                        type="checkbox"
-                        checked={breakChanceEnabled}
-                        onChange={(event) => setBreakChanceEnabled(event.target.checked)}
-                      />
-                      <div>
-                        <div className="overlay-manual-toggle__title">Break chance banner</div>
-                        <div className="overlay-manual-toggle__hint">
-                          Show when the recieving team loses possession.
-                        </div>
-                      </div>
-                      <TimedButton
-                        durationSeconds={9}
-                        onClick={(e) => { e.preventDefault(); handleTestBreakChance(); }}
-                      >
-                        Test
-                      </TimedButton>
-                    </label>
-                  </div>
-
-                  <div className="overlay-banner-block">
                     <div className="overlay-banner-block__header">
                       <div className="overlay-banner-block__title">Player stats</div>
                       {renderAutoFadeToggle(playerStatsAutoFade, setPlayerStatsAutoFade)}
@@ -266,18 +256,32 @@ export function ControlView({
                       <Select
                         value={bannerPlayerId}
                         onChange={(event) => setBannerPlayerId(event.target.value)}
+                        className="player-select"
                       >
                         <option value="">Select player</option>
-                        {bannerPlayerOptions.map((player) => (
-                          <option key={player.id || `${player.name}-${player.number || "na"}`} value={player.id}>
-                            {Number.isFinite(Number(player.number)) ? `#${player.number} ` : ""}
-                            {player.name}
-                          </option>
-                        ))}
+                        {bannerPlayerOptions.teamA.length > 0 && (
+                          <optgroup label={matchDetails?.team_a?.name || "Team A"}>
+                            {bannerPlayerOptions.teamA.map((player) => (
+                              <option key={player.id} value={player.id}>
+                                {Number.isFinite(player.number) ? `#${player.number} ` : ""}{player.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                        {bannerPlayerOptions.teamB.length > 0 && (
+                          <optgroup label={matchDetails?.team_b?.name || "Team B"}>
+                            {bannerPlayerOptions.teamB.map((player) => (
+                              <option key={player.id} value={player.id}>
+                                {Number.isFinite(player.number) ? `#${player.number} ` : ""}{player.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
                       </Select>
                     </Field>
                     <TimedButton
                       durationSeconds={BUTTON_DURATION_SECONDS.playerStats}
+                      autoFade={playerStatsAutoFade}
                       onClick={handleTriggerBanner}
                       disabled={!selectedBannerPlayer}
                     >
@@ -330,6 +334,7 @@ export function ControlView({
                     </div>
                     <TimedButton
                       durationSeconds={BUTTON_DURATION_SECONDS.matchStats}
+                      autoFade={matchStatsAutoFade}
                       onClick={handleTriggerMatchStats}
                     >
                       Show match stats
@@ -344,32 +349,38 @@ export function ControlView({
                     <div className="overlay-banner-actions">
                       <TimedButton
                         durationSeconds={BUTTON_DURATION_SECONDS.timeout}
+                        autoFade={timeoutAutoFade}
                         onClick={() => handleTriggerTimeout("A")}
                       >
-                        {`Timeout ${matchDetails?.team_a?.name || "Team A"}`}
+                        {matchDetails?.team_a?.name || "Team A"}
                       </TimedButton>
                       <TimedButton
                         durationSeconds={BUTTON_DURATION_SECONDS.timeout}
+                        autoFade={timeoutAutoFade}
                         onClick={() => handleTriggerTimeout("B")}
                       >
-                        {`Timeout ${matchDetails?.team_b?.name || "Team B"}`}
+                        {matchDetails?.team_b?.name || "Team B"}
                       </TimedButton>
                     </div>
                   </div>
 
                   <div className="overlay-banner-block">
                     <div className="overlay-banner-block__header">
-                      <div className="overlay-banner-block__title">Halftime + stoppage</div>
+                      <div className="overlay-banner-block__title">Events</div>
                       {renderAutoFadeToggle(matchEventAutoFade, setMatchEventAutoFade)}
                     </div>
                     <div className="overlay-banner-actions">
                       <TimedButton
+                        durationSeconds={BUTTON_DURATION_SECONDS.matchEvent}
+                        autoFade={matchEventAutoFade}
                         disabled={!bannerEventGroups.halftimeEvent}
                         onClick={() => handleTriggerMatchEvent(bannerEventGroups.halftimeEvent)}
                       >
                         Halftime
                       </TimedButton>
                       <TimedButton
+                        durationSeconds={BUTTON_DURATION_SECONDS.matchEvent}
+                        autoFade={matchEventAutoFade}
                         disabled={!bannerEventGroups.stoppage.length}
                         onClick={() => handleTriggerMatchEvent(bannerEventGroups.stoppage[0])}
                       >
@@ -391,11 +402,38 @@ export function ControlView({
                         <TimedButton
                           key={callLabel}
                           durationSeconds={BUTTON_DURATION_SECONDS.fieldCall}
+                          autoFade={fieldCallAutoFade}
                           onClick={() => handleTriggerFieldCall(callLabel)}
                         >
                           {callLabel}
                         </TimedButton>
                       ))}
+                    </div>
+                  </div>
+
+                  <div className="overlay-banner-block">
+                    <div className="overlay-banner-block__title">Break chance</div>
+                    <div className="overlay-banner-block__header">
+                      <label className="overlay-switch">
+                        <span className="overlay-switch__label">Enabled</span>
+                        <span className="overlay-switch__control">
+                          <input
+                            type="checkbox"
+                            checked={breakChanceEnabled}
+                            onChange={(event) => setBreakChanceEnabled(event.target.checked)}
+                          />
+                          <span className="overlay-switch__slider" aria-hidden="true"></span>
+                        </span>
+                      </label>
+                      <TimedButton
+                        durationSeconds={BUTTON_DURATION_SECONDS.breakChance}
+                        autoFade
+                        disabled={!breakChanceEnabled}
+                        onClick={handleTriggerBreakChance}
+                        className="is-narrow"
+                      >
+                        Test BC
+                      </TimedButton>
                     </div>
                   </div>
 
@@ -408,11 +446,13 @@ export function ControlView({
               <Card className="overlay-card overlay-roster-card">
                 <SectionHeader
                   title="Team rosters"
-                  description="Players loaded for the active event."
                   action={
-                    <TimedButton durationSeconds={BUTTON_DURATION_SECONDS.teamRosters} onClick={handleTriggerTeamRosters}>
-                      Show overlay
-                    </TimedButton>
+                    <>
+                      {renderAutoFadeToggle(teamRostersAutoFade, setTeamRostersAutoFade)}
+                      <TimedButton durationSeconds={BUTTON_DURATION_SECONDS.teamRosters} autoFade={teamRostersAutoFade} onClick={handleTriggerTeamRosters}>
+                        Show rosters
+                      </TimedButton>
+                    </>
                   }
                   divider
                 />

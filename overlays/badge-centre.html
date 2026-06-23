@@ -30,6 +30,7 @@
       /* ── Badge-centre ── */
       .bc-root {
         position: absolute;
+        z-index: 2;
         top: 24px;
         left: 50%;
         transform: translateX(-50%);
@@ -53,50 +54,95 @@
         align-items: center;
         background: var(--team-bg, #034694);
         color: var(--team-text, #ffffff);
-        padding: 0 22px 0 16px;
+        padding: 0 22px 0 2px;
         gap: 12px;
-        min-width: 300px;
+        flex: 1 1 0;
         position: relative;
       }
 
-      .bc-break-strip {
-        position: absolute;
-        left: 0;
-        right: 0;
-        bottom: 100%;
-        padding: 5px 12px;
-        background: #dc2626;
-        color: #ffffff;
-        font-size: 12px;
-        font-weight: 700;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-        text-align: center;
-        white-space: normal;
-        line-height: 1.15;
-        pointer-events: none;
-        opacity: 0;
-        transition: opacity 0.18s ease;
+      /* ── Sub-row: TO + BC panels below the scoreboard ── */
+
+      /* Appended directly to .bc-scores so it inherits the 220px column width */
+      .bc-sub-row {
+        display: flex;
+        width: 100%;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        border-radius: 0 0 10px 10px;
+        overflow: hidden;
       }
 
-      .bc-break-strip.is-active,
-      .bc-break-strip.is-persistent {
-        opacity: 1;
+      /* Each half covers one team */
+      .bc-sub-cell {
+        flex: 1 1 0;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        min-width: 0;
       }
+
+      /* Timeout panel */
+      .bc-timeout {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #1c1c1c;
+        border: 1px solid rgba(255,255,255,0.12);
+        border-top: 0;
+        gap: 0;
+        overflow: hidden;
+        max-height: 0;
+        padding: 0;
+        transition: max-height 0.18s ease-out, padding 0.18s ease-out;
+        pointer-events: none;
+      }
+
+      .bc-timeout.is-active {
+        max-height: 80px;
+        padding: 4px 8px 6px;
+      }
+
+      #timeoutBannerA { border-right: 1px solid rgba(255,255,255,0.08); }
+      #timeoutBannerB { }
+
+      .bc-timeout__label {
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.45);
+        white-space: nowrap;
+      }
+
+      .bc-timeout__timer {
+        font-family: "Bebas Neue", sans-serif;
+        font-size: 26px;
+        letter-spacing: 0.16em;
+        color: #ffffff;
+        line-height: 1;
+        white-space: nowrap;
+      }
+
+      .bc-timeout__who {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.45);
+        margin-top: 1px;
+        white-space: nowrap;
+      }
+
 
       .bc-badge {
-        width: 52px;
-        height: 52px;
-        border-radius: 50%;
+        height: 95%;
+        aspect-ratio: 1;
         overflow: hidden;
-        background: #ffffff;
         flex-shrink: 0;
         display: flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 0 0 3px rgba(255,255,255,0.25);
-        transform: translateX(-8px);
-        z-index: 2;
+        padding: 2px;
         position: relative;
       }
 
@@ -130,6 +176,12 @@
       /* Score blocks */
       .bc-scores {
         display: flex;
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .bc-score-row {
+        display: flex;
         align-items: stretch;
       }
 
@@ -137,7 +189,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 88px;
+        width: 110px;
         background: #1c1c1c;
         font-family: "Bebas Neue", sans-serif;
         font-size: 58px;
@@ -153,24 +205,16 @@
         flex-direction: row-reverse;
         background: var(--team-bg, #da291c);
         color: var(--team-text, #ffffff);
-        padding: 0 16px 0 22px;
+        padding: 0 2px 0 22px;
         gap: 12px;
-        min-width: 300px;
+        flex: 1 1 0;
         position: relative;
       }
 
-      .bc-side-b .bc-badge { transform: translateX(8px); }
+      .bc-side-b .bc-badge { transform: none; }
       .bc-side-b .bc-team-name { text-align: right; }
 
-      /* ── Bottom row: clock pill stays fixed, timeouts slide out absolutely ── */
-      .bc-bottom {
-        position: relative;
-        display: flex;
-        align-items: flex-start;
-        justify-content: center;
-      }
-
-      /* Clock pill — same width as the two score boxes (2 × 88px) */
+      /* Clock pill — spans the full width of the two score boxes */
       .bc-clock-pill {
         position: relative;
         display: flex;
@@ -182,69 +226,12 @@
         font-size: 26px;
         letter-spacing: 0.16em;
         padding: 6px 0;
-        border-radius: 0 0 24px 24px;
+        border-radius: 0 0 10px 10px;
         box-shadow: 0 8px 20px rgba(0,0,0,0.4);
-        width: 176px;
-        flex-shrink: 0;
+        width: 100%;
         text-align: center;
         overflow: visible;
         z-index: 1;
-      }
-
-      /* Timeout tabs — absolutely positioned, slide out from behind clock pill */
-      .bc-timeout {
-        position: absolute;
-        top: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        background: #1c1c1c;
-        border: 1px solid rgba(255,255,255,0.12);
-        border-top: 0;
-        gap: 0;
-        overflow: hidden;
-        width: 0;
-        padding: 4px 0 6px;
-        box-shadow: 0 8px 20px rgba(0,0,0,0.4);
-        transition: width 0.18s ease-out, padding 0.18s ease-out;
-      }
-
-      .bc-timeout.is-active {
-        width: 140px;
-        padding: 4px 16px 6px;
-      }
-
-      /* A slides left, B slides right — anchored to clock pill edges */
-      #timeoutBannerA { right: 100%; border-radius: 0 0 0 16px; }
-      #timeoutBannerB { left: 100%; border-radius: 0 0 16px 0; }
-
-      .bc-timeout__label {
-        font-size: 9px;
-        font-weight: 700;
-        letter-spacing: 0.22em;
-        text-transform: uppercase;
-        color: rgba(255,255,255,0.45);
-        white-space: nowrap;
-      }
-
-      .bc-timeout__timer {
-        font-family: "Bebas Neue", sans-serif;
-        font-size: 26px;
-        letter-spacing: 0.16em;
-        color: #ffffff;
-        line-height: 1;
-        white-space: nowrap;
-      }
-
-      .bc-timeout__who {
-        font-size: 10px;
-        font-weight: 700;
-        letter-spacing: 0.16em;
-        text-transform: uppercase;
-        color: rgba(255,255,255,0.45);
-        margin-top: 1px;
-        white-space: nowrap;
       }
 
       /* ── Field call strip — underneath everything ── */
@@ -566,7 +553,7 @@
 
       .roster-banner-item {
         display: flex;
-        justify-content: center;
+        justify-content: flex-start;
         font-size: 13px;
         font-weight: 600;
         letter-spacing: 0.04em;
@@ -578,7 +565,7 @@
         display: inline-flex;
         flex-wrap: wrap;
         align-items: center;
-        justify-content: center;
+        justify-content: flex-start;
         gap: 4px;
         min-width: 0;
       }
@@ -604,6 +591,11 @@
         color: var(--team-bg, #111111);
       }
     </style>
+    <script>
+      document.head.insertAdjacentHTML('beforeend', '<style>' +
+        '#canvas{outline:1px solid rgba(255,255,255,0.4);background-image:repeating-linear-gradient(45deg,rgba(255,255,255,0.03) 0px,rgba(255,255,255,0.03) 1px,transparent 1px,transparent 12px),repeating-linear-gradient(-45deg,rgba(255,255,255,0.03) 0px,rgba(255,255,255,0.03) 1px,transparent 1px,transparent 12px)}' +
+      '</style>');
+    </script>
   </head>
   <body class="overlay-fixed">
     <div id="viewport">
@@ -612,7 +604,6 @@
           <div class="bc-bar">
             <!-- Team A -->
             <div class="bc-side-a" id="teamABox">
-              <div class="bc-break-strip" id="breakChanceBannerA">BREAK<br>CHANCE</div>
               <div class="bc-badge" id="teamABadgeCell">
                 <img id="teamALogo" alt="" />
                 <span class="bc-badge-fallback" id="teamALogoFallback">A</span>
@@ -620,37 +611,41 @@
               <span class="bc-team-name" id="teamAName">Team A</span>
             </div>
 
-            <!-- Scores -->
+            <!-- Scores + clock stacked -->
             <div class="bc-scores">
-              <div class="bc-score-box"><span id="scoreA">0</span></div>
-              <div class="bc-score-box"><span id="scoreB">0</span></div>
+              <div class="bc-score-row">
+                <div class="bc-score-box"><span id="scoreA">0</span></div>
+                <div class="bc-score-box"><span id="scoreB">0</span></div>
+              </div>
+              <div class="bc-clock-pill">
+                <span id="matchClock">00:00</span>
+              </div>
+              <!-- TO + BC panels below the scoreboard -->
+              <div class="bc-sub-row">
+                <div class="bc-sub-cell">
+                  <div class="bc-timeout" id="timeoutBannerA">
+                    <span class="bc-timeout__label">TO</span>
+                    <span class="bc-timeout__timer" id="toTimerA">75</span>
+                    <span class="bc-timeout__who" id="toWhoA">Team A</span>
+                  </div>
+                </div>
+                <div class="bc-sub-cell">
+                  <div class="bc-timeout" id="timeoutBannerB">
+                    <span class="bc-timeout__label">TO</span>
+                    <span class="bc-timeout__timer" id="toTimerB">75</span>
+                    <span class="bc-timeout__who" id="toWhoB">Team B</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- Team B -->
             <div class="bc-side-b" id="teamBBox">
-              <div class="bc-break-strip" id="breakChanceBannerB">BREAK<br>CHANCE</div>
               <div class="bc-badge" id="teamBBadgeCell">
                 <img id="teamBLogo" alt="" />
                 <span class="bc-badge-fallback" id="teamBLogoFallback">B</span>
               </div>
               <span class="bc-team-name" id="teamBName">Team B</span>
-            </div>
-          </div>
-
-          <!-- Bottom: clock pill fixed, timeouts slide out absolutely from it -->
-          <div class="bc-bottom">
-            <div class="bc-clock-pill">
-              <span id="matchClock">00:00</span>
-              <div class="bc-timeout" id="timeoutBannerA">
-                <span class="bc-timeout__label">TO</span>
-                <span class="bc-timeout__timer" id="toTimerA">75</span>
-                <span class="bc-timeout__who" id="toWhoA">Team A</span>
-              </div>
-              <div class="bc-timeout" id="timeoutBannerB">
-                <span class="bc-timeout__label">TO</span>
-                <span class="bc-timeout__timer" id="toTimerB">75</span>
-                <span class="bc-timeout__who" id="toWhoB">Team B</span>
-              </div>
             </div>
           </div>
 
@@ -817,6 +812,6 @@
         applyTeamLogo('teamBLogo', 'teamBBadgeCell', 'stallcount:logo-team-b');
       })();
     </script>
-    <script type="module" src="./src/overlay-entry.js"></script>
+    <script type="module" src="../src/overlays/wfdf-competitive.js"></script>
   </body>
 </html>

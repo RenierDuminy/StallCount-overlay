@@ -97,7 +97,6 @@ body.overlay-fixed .overlay-event {
   z-index: 2;
 }
 
-.overlay-break-chance,
 .overlay-timeout,
 .overlay-field-call {
   position: absolute;
@@ -125,21 +124,19 @@ body.overlay-fixed .overlay-event {
   z-index: 4;
 }
 
-.overlay-break-chance.is-active {
-  opacity: 1;
-}
-
 .overlay-logo {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 12px;
-  background: #ffffff;
+  width: 61px;
+  height: 61px;
+  flex-shrink: 0;
+  padding: 2px;
 }
 
 .overlay-logo img {
-  max-width: 100%;
-  max-height: 48px;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   display: none;
 }
@@ -305,6 +302,41 @@ body.overlay-fixed .overlay-event {
 .overlay-field-call.is-persistent {
   opacity: 1;
   transform: translateY(0);
+}
+
+.overlay-break-chance {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  padding: 6px 8px;
+  background: #991b1b;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: center;
+  border-radius: 10px 10px 0 0;
+  box-shadow: 0 10px 24px rgba(153, 27, 27, 0.35);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.overlay-break-chance.is-active {
+  animation: timeout-fade 4s ease-in-out forwards;
+}
+
+.overlay-break-chance.is-persistent {
+  opacity: 1;
+}
+
+.break-chance-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
 }
 
 .overlay-match-event-banner {
@@ -560,7 +592,7 @@ body.overlay-fixed .overlay-event {
 
 .roster-banner-item {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   font-size: 0.96rem;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -572,7 +604,7 @@ body.overlay-fixed .overlay-event {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.45rem;
   min-width: 0;
 }
@@ -778,11 +810,6 @@ body.overlay-fixed .overlay-event {
 }
 
 @media (max-width: 720px) {
-  .overlay-break-chance {
-    font-size: 10px;
-    letter-spacing: 0.16em;
-  }
-
   .overlay-team {
     justify-content: center;
   }

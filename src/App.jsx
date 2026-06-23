@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { SectionShell } from "./components/ui/primitives";
 import { supabase } from "./lib/supabaseClient";
 import { MATCH_LOG_EVENT_CODES } from "./services/matchLogService";
+import { resolveEventCode } from "./lib/overlayEngine";
 import { ConfigView } from "./views/ConfigView";
 import { ControlView } from "./views/ControlView";
 
@@ -51,25 +52,13 @@ function getInitialMatchId() {
 function getInitialOverlayChoice() {
   const searchParams = new URLSearchParams(window.location.search);
   if (searchParams.has("overlay")) {
-    const overlayValue = (searchParams.get("overlay") || "").trim();
-    return overlayValue && overlayValue !== "overlay-wfdf-competitive.html"
-      ? "custom"
-      : "overlay-wfdf-competitive.html";
+    return (searchParams.get("overlay") || "").trim() || "overlays/wfdf-competitive.html";
   }
 
-  return readPersistedAppSettings().overlayChoice === "custom"
-    ? "custom"
-    : "overlay-wfdf-competitive.html";
+  const persisted = readPersistedAppSettings().overlayChoice;
+  return persisted && persisted !== "custom" ? persisted : "overlays/wfdf-competitive.html";
 }
 
-function getInitialCustomOverlay() {
-  const searchParams = new URLSearchParams(window.location.search);
-  if (searchParams.has("overlay")) {
-    const overlayValue = (searchParams.get("overlay") || "").trim();
-    return overlayValue && overlayValue !== "overlay-wfdf-competitive.html" ? overlayValue : "";
-  }
-  return (readPersistedAppSettings().customOverlay || "").toString().trim();
-}
 
 function getInitialTeamTheme(teamKey) {
   const searchParams = new URLSearchParams(window.location.search);
@@ -111,17 +100,6 @@ function getInitialManualScore(key) {
   return (readPersistedAppSettings()[key] || "").toString().trim();
 }
 
-function getInitialBreakChanceEnabled() {
-  const searchParams = new URLSearchParams(window.location.search);
-  if (searchParams.has("breakChance")) {
-    const value = (searchParams.get("breakChance") || "").trim().toLowerCase();
-    if (!value) return true;
-    return !["0", "false", "no", "off"].includes(value);
-  }
-
-  const persistedValue = readPersistedAppSettings().breakChanceEnabled;
-  return typeof persistedValue === "boolean" ? persistedValue : true;
-}
 
 function getInitialIsInitialized() {
   const searchParams = new URLSearchParams(window.location.search);
@@ -225,7 +203,6 @@ function buildOverlayUrl({
   teamATheme,
   teamBTheme,
   manualOverrides,
-  breakChanceEnabled,
   isInitialized,
 }) {
   if (!overlayFile) return "";
@@ -260,11 +237,6 @@ function buildOverlayUrl({
       url.searchParams.set("manualScoreB", manualOverrides.scoreB);
     }
   }
-  if (breakChanceEnabled === false) {
-    url.searchParams.set("breakChance", "0");
-  } else {
-    url.searchParams.delete("breakChance");
-  }
   if (isInitialized) {
     url.searchParams.set("initialized", "1");
   } else {
@@ -274,30 +246,11 @@ function buildOverlayUrl({
   return url.toString();
 }
 
-function resolveEventCode(eventType) {
-  const rawCode = (eventType?.code || "").toString().trim().toLowerCase();
-  if (rawCode) return rawCode;
-
-  const description = (eventType?.description || "").toString().trim().toLowerCase();
-  if (!description) return "";
-
-  if (description.includes("calahan")) return MATCH_LOG_EVENT_CODES.CALAHAN;
-  if (description.includes("score")) return MATCH_LOG_EVENT_CODES.SCORE;
-  if (description.includes("timeout")) return MATCH_LOG_EVENT_CODES.TIMEOUT;
-  if (description.includes("halftime")) return MATCH_LOG_EVENT_CODES.HALFTIME_START;
-  if (description.includes("turnover")) return MATCH_LOG_EVENT_CODES.TURNOVER;
-  if (description.includes("block")) return MATCH_LOG_EVENT_CODES.BLOCK;
-  if (description.includes("stoppage")) return MATCH_LOG_EVENT_CODES.STOPPAGE_START;
-  if (description.includes("match start")) return MATCH_LOG_EVENT_CODES.MATCH_START;
-  if (description.includes("match end")) return MATCH_LOG_EVENT_CODES.MATCH_END;
-
-  return description.replace(/\s+/g, "_");
-}
 
 export default function App() {
   const overlayBannerChannelRef = useMemo(() => ({ current: null }), []);
   const [overlayChoice, setOverlayChoice] = useState(getInitialOverlayChoice());
-  const [customOverlay, setCustomOverlay] = useState(getInitialCustomOverlay());
+
   const [matchId, setMatchId] = useState(getInitialMatchId());
   const [isInitialized, setIsInitialized] = useState(getInitialIsInitialized());
   const [teamATheme, setTeamATheme] = useState(getInitialTeamTheme("teamATheme"));
@@ -309,12 +262,15 @@ export default function App() {
   const [manualClock, setManualClock] = useState(getInitialManualClock());
   const [manualScoreA, setManualScoreA] = useState(getInitialManualScore("manualScoreA"));
   const [manualScoreB, setManualScoreB] = useState(getInitialManualScore("manualScoreB"));
-  const [breakChanceEnabled, setBreakChanceEnabled] = useState(getInitialBreakChanceEnabled());
+  const [breakChanceEnabled, setBreakChanceEnabled] = useState(
+    () => Boolean(readPersistedAppSettings().breakChanceEnabled),
+  );
   const [playerStatsAutoFade, setPlayerStatsAutoFade] = useState(getInitialPopupAutoFade("playerStatsAutoFade"));
   const [matchStatsAutoFade, setMatchStatsAutoFade] = useState(getInitialPopupAutoFade("matchStatsAutoFade"));
   const [timeoutAutoFade, setTimeoutAutoFade] = useState(getInitialPopupAutoFade("timeoutAutoFade"));
   const [matchEventAutoFade, setMatchEventAutoFade] = useState(getInitialPopupAutoFade("matchEventAutoFade"));
   const [fieldCallAutoFade, setFieldCallAutoFade] = useState(getInitialPopupAutoFade("fieldCallAutoFade"));
+  const [teamRostersAutoFade, setTeamRostersAutoFade] = useState(getInitialPopupAutoFade("teamRostersAutoFade"));
   const [bannerPlayerId, setBannerPlayerId] = useState(getInitialBannerPlayerId());
   const [bannerStatus, setBannerStatus] = useState("");
   const [matchEventButtons, setMatchEventButtons] = useState([]);
@@ -350,7 +306,7 @@ export default function App() {
 
   const trimmedMatchId = matchId.trim();
   const hasMatchId = Boolean(trimmedMatchId);
-  const resolvedOverlayFile = overlayChoice === "custom" ? customOverlay : overlayChoice;
+  const resolvedOverlayFile = overlayChoice;
 
   const overlayUrl = useMemo(
     () =>
@@ -367,7 +323,6 @@ export default function App() {
               scoreA: manualScoreA,
               scoreB: manualScoreB,
             },
-            breakChanceEnabled,
             isInitialized,
           })
         : "",
@@ -381,7 +336,6 @@ export default function App() {
       manualClock,
       manualScoreA,
       manualScoreB,
-      breakChanceEnabled,
       isInitialized,
     ],
   );
@@ -410,30 +364,29 @@ export default function App() {
   const teamBRoster = rosterByTeam[matchDetails?.team_b?.id] || [];
 
   const bannerPlayerOptions = useMemo(() => {
-    const combined = [...teamARoster, ...teamBRoster].filter((player) => player?.name);
-    const withNumbers = [];
-    const withoutNumbers = [];
-
-    combined.forEach((player) => {
-      const parsedNumber = Number(player.number);
-      if (Number.isFinite(parsedNumber)) {
-        withNumbers.push({ id: player.id, name: player.name, number: parsedNumber, teamId: player.teamId });
-      } else {
-        withoutNumbers.push({ id: player.id, name: player.name, number: null, teamId: player.teamId });
-      }
-    });
-
-    withNumbers.sort((a, b) => {
-      if (a.number !== b.number) return a.number - b.number;
-      return a.name.localeCompare(b.name);
-    });
-    withoutNumbers.sort((a, b) => a.name.localeCompare(b.name));
-
-    return [...withNumbers, ...withoutNumbers];
+    const sortRoster = (roster) => {
+      const withNumbers = [];
+      const withoutNumbers = [];
+      roster.filter((p) => p?.name).forEach((player) => {
+        const parsedNumber = Number(player.number);
+        if (Number.isFinite(parsedNumber)) {
+          withNumbers.push({ id: player.id, name: player.name, number: parsedNumber, teamId: player.teamId });
+        } else {
+          withoutNumbers.push({ id: player.id, name: player.name, number: null, teamId: player.teamId });
+        }
+      });
+      withNumbers.sort((a, b) => a.number !== b.number ? a.number - b.number : a.name.localeCompare(b.name));
+      withoutNumbers.sort((a, b) => a.name.localeCompare(b.name));
+      return [...withNumbers, ...withoutNumbers];
+    };
+    return {
+      teamA: sortRoster(teamARoster),
+      teamB: sortRoster(teamBRoster),
+    };
   }, [teamARoster, teamBRoster]);
 
   const selectedBannerPlayer = useMemo(
-    () => bannerPlayerOptions.find((player) => player.id === bannerPlayerId) || null,
+    () => [...bannerPlayerOptions.teamA, ...bannerPlayerOptions.teamB].find((p) => p.id === bannerPlayerId) || null,
     [bannerPlayerOptions, bannerPlayerId],
   );
 
@@ -561,6 +514,7 @@ export default function App() {
   const handleTriggerTeamRosters = async () => {
     const payload = {
       type: "teamRosters",
+      autoFade: teamRostersAutoFade,
       title: "Team rosters",
       teamAName: matchDetails?.team_a?.name || "Team A",
       teamBName: matchDetails?.team_b?.name || "Team B",
@@ -592,28 +546,6 @@ export default function App() {
     }
   };
 
-  const handleTriggerBreakChance = async (team, autoFade = timeoutAutoFade) => {
-    if (!team) return;
-    const payload = { type: "breakChance", autoFade, team, ts: Date.now() };
-    try {
-      await publishOverlayPayload(payload);
-      setBannerStatus(`Break chance banner queued for Team ${team}.`);
-      window.setTimeout(() => setBannerStatus(""), 3000);
-    } catch (error) {
-      setBannerStatus("Unable to trigger break chance banner.");
-      window.setTimeout(() => setBannerStatus(""), 3000);
-    }
-  };
-
-  const handleTestBreakChance = async () => {
-    try {
-      await handleTriggerBreakChance("A", true);
-      window.setTimeout(() => handleTriggerBreakChance("B", true), 5000);
-    } catch (error) {
-      setBannerStatus("Unable to run break chance test.");
-      window.setTimeout(() => setBannerStatus(""), 3000);
-    }
-  };
 
   const handleTriggerTimeout = async (team) => {
     if (!team) return;
@@ -672,6 +604,22 @@ export default function App() {
     }
   };
 
+  const handleTriggerBreakChance = async () => {
+    const payload = {
+      type: "breakChance",
+      team: "both",
+      ts: Date.now(),
+    };
+    try {
+      await publishOverlayPayload(payload);
+      setBannerStatus("Break chance banner queued.");
+      window.setTimeout(() => setBannerStatus(""), 3000);
+    } catch (error) {
+      setBannerStatus("Unable to trigger break chance banner.");
+      window.setTimeout(() => setBannerStatus(""), 3000);
+    }
+  };
+
   useEffect(() => {
     if (overlayBannerChannelRef.current) {
       supabase.removeChannel(overlayBannerChannelRef.current);
@@ -717,7 +665,6 @@ export default function App() {
   useEffect(() => {
     const nextSettings = {
       overlayChoice,
-      customOverlay,
       matchId: trimmedMatchId,
       isInitialized,
       teamATheme,
@@ -734,6 +681,7 @@ export default function App() {
       timeoutAutoFade,
       matchEventAutoFade,
       fieldCallAutoFade,
+      teamRostersAutoFade,
       bannerPlayerId,
     };
 
@@ -744,7 +692,6 @@ export default function App() {
     }
   }, [
     overlayChoice,
-    customOverlay,
     trimmedMatchId,
     isInitialized,
     teamATheme,
@@ -761,6 +708,7 @@ export default function App() {
     timeoutAutoFade,
     matchEventAutoFade,
     fieldCallAutoFade,
+    teamRostersAutoFade,
     bannerPlayerId,
   ]);
 
@@ -998,43 +946,59 @@ export default function App() {
   useEffect(() => {
     if (!trimmedMatchId) return () => {};
 
-    const matchLogsChannel = supabase
-      .channel(`overlay-control:match_logs:${trimmedMatchId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "match_logs",
-          filter: `match_id=eq.${trimmedMatchId}`,
-        },
-        (payload) => {
-          if (payload.eventType === "DELETE") {
-            const removedId = payload.old?.id;
-            if (!removedId) return;
-            setMatchLogs((current) => current.filter((log) => log.id !== removedId));
-            return;
-          }
+    let retryTimer = null;
+    let activeChannel = null;
 
-          const incoming = payload.new;
-          if (!incoming) return;
-          setMatchLogs((current) => {
-            const existingIndex = current.findIndex((log) => log.id === incoming.id);
-            if (existingIndex >= 0) {
-              const next = [...current];
-              next[existingIndex] = incoming;
-              return next;
+    const subscribe = () => {
+      const channel = supabase
+        .channel(`overlay-control:match_logs:${trimmedMatchId}:${Date.now()}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "match_logs",
+            filter: `match_id=eq.${trimmedMatchId}`,
+          },
+          (payload) => {
+            if (payload.eventType === "DELETE") {
+              const removedId = payload.old?.id;
+              if (!removedId) return;
+              setMatchLogs((current) => current.filter((log) => log.id !== removedId));
+              return;
             }
-            return [...current, incoming].sort(
-              (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-            );
-          });
-        },
-      )
-      .subscribe();
+
+            const incoming = payload.new;
+            if (!incoming) return;
+            setMatchLogs((current) => {
+              const existingIndex = current.findIndex((log) => log.id === incoming.id);
+              if (existingIndex >= 0) {
+                const next = [...current];
+                next[existingIndex] = incoming;
+                return next;
+              }
+              return [...current, incoming].sort(
+                (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+              );
+            });
+          },
+        )
+        .subscribe((status) => {
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            supabase.removeChannel(channel);
+            activeChannel = null;
+            retryTimer = window.setTimeout(subscribe, 3000);
+          }
+        });
+
+      activeChannel = channel;
+    };
+
+    subscribe();
 
     return () => {
-      supabase.removeChannel(matchLogsChannel);
+      if (retryTimer) window.clearTimeout(retryTimer);
+      if (activeChannel) supabase.removeChannel(activeChannel);
     };
   }, [trimmedMatchId]);
 
@@ -1246,8 +1210,6 @@ export default function App() {
           <ConfigView
             overlayChoice={overlayChoice}
             setOverlayChoice={setOverlayChoice}
-            customOverlay={customOverlay}
-            setCustomOverlay={setCustomOverlay}
             matchId={matchId}
             setMatchId={setMatchId}
             teamATheme={teamATheme}
@@ -1296,8 +1258,6 @@ export default function App() {
             logsError={logsError}
             rosterError={rosterError}
             rosterByTeam={rosterByTeam}
-            breakChanceEnabled={breakChanceEnabled}
-            setBreakChanceEnabled={setBreakChanceEnabled}
             bannerPlayerId={bannerPlayerId}
             setBannerPlayerId={setBannerPlayerId}
             bannerStatus={bannerStatus}
@@ -1316,14 +1276,17 @@ export default function App() {
             setMatchEventAutoFade={setMatchEventAutoFade}
             fieldCallAutoFade={fieldCallAutoFade}
             setFieldCallAutoFade={setFieldCallAutoFade}
+            teamRostersAutoFade={teamRostersAutoFade}
+            setTeamRostersAutoFade={setTeamRostersAutoFade}
+            breakChanceEnabled={breakChanceEnabled}
+            setBreakChanceEnabled={setBreakChanceEnabled}
             handleTriggerBanner={handleTriggerBanner}
             handleTriggerMatchStats={handleTriggerMatchStats}
             handleTriggerTeamRosters={handleTriggerTeamRosters}
-            handleTriggerBreakChance={handleTriggerBreakChance}
-            handleTestBreakChance={handleTestBreakChance}
             handleTriggerTimeout={handleTriggerTimeout}
             handleTriggerMatchEvent={handleTriggerMatchEvent}
             handleTriggerFieldCall={handleTriggerFieldCall}
+            handleTriggerBreakChance={handleTriggerBreakChance}
           />
         ) : null}
       </SectionShell>

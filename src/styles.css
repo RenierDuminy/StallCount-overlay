@@ -1080,6 +1080,7 @@
   pointer-events: none;
 }
 
+
 .preview-placeholder {
   position: absolute;
   inset: 0;
@@ -1605,12 +1606,30 @@
   text-align: center;
 }
 
+.sc-timed-btn.is-narrow {
+  width: auto;
+  white-space: nowrap;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  flex-shrink: 0;
+}
+
 .sc-timed-btn:hover {
   filter: brightness(1.08);
 }
 
 .sc-timed-btn.is-running {
   color: #03140f;
+}
+
+.sc-timed-btn.is-latched {
+  background: #dc2626;
+  border-color: #991b1b;
+  color: #fff;
+}
+
+.sc-timed-btn.is-latched:hover {
+  filter: brightness(1.12);
 }
 
 .sc-timed-btn.is-disabled,

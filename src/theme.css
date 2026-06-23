@@ -543,7 +543,7 @@ select.sc-input {
   background-size: 6px 6px, 6px 6px;
   background-repeat: no-repeat;
   padding-right: 2.5rem;
-  border: 1px solid #000000;
+  border: 1px solid rgba(255, 255, 255, 0.25);
 }
 
 select.sc-input option {
@@ -555,6 +555,10 @@ select.sc-input option {
 textarea.sc-input {
   min-height: 120px;
   resize: vertical;
+}
+
+select.sc-input.player-select {
+  border: 1px solid rgba(0, 0, 0, 0.6);
 }
 
 .sc-alert {
