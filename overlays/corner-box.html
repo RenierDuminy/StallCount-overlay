@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <title>Corner Box Overlay</title>
     <style>
-      @import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;600;700&display=swap");
+      @import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Semi+Condensed:wght@400;600;700&display=swap");
 
       *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -40,13 +40,14 @@
 
       .cb-root {
         width: 300px;
-        font-family: "DM Sans", sans-serif;
+        font-family: "Barlow Semi Condensed", sans-serif;
         background: #111111;
         color: #ffffff;
         box-shadow: 0 12px 32px rgba(0,0,0,0.55);
         overflow: visible;
         flex-shrink: 0;
       }
+
 
       /* Top strip: period + clock */
       .cb-header {
@@ -258,7 +259,7 @@
         background: #1a1a1a;
         border-top: 1px solid #333333;
         white-space: nowrap;
-        font-family: "DM Sans", sans-serif;
+        font-family: "Barlow Semi Condensed", sans-serif;
       }
 
       .cb-pill.is-active { display: flex; }
@@ -293,7 +294,7 @@
         align-items: stretch;
         overflow: hidden;
         box-shadow: 0 12px 36px rgba(0,0,0,0.55);
-        font-family: "DM Sans", sans-serif;
+        font-family: "Barlow Semi Condensed", sans-serif;
         white-space: nowrap;
       }
 
@@ -414,7 +415,7 @@
         display: block;
         width: 640px;
         transition: opacity 0.18s ease, transform 0.18s ease;
-        font-family: "DM Sans", sans-serif;
+        font-family: "Barlow Semi Condensed", sans-serif;
         z-index: 10;
       }
 
@@ -530,7 +531,7 @@
         display: block;
         width: 900px;
         transition: opacity 0.18s ease, transform 0.18s ease;
-        font-family: "DM Sans", sans-serif;
+        font-family: "Barlow Semi Condensed", sans-serif;
         z-index: 10;
       }
 
@@ -648,7 +649,7 @@
         <div class="cb-wrap">
           <div class="cb-root">
             <div class="cb-header">
-              <span class="cb-period" id="statusLabel">LIVE</span>
+              <span class="cb-period" id="statusLabel" data-role="status-label">LIVE</span>
               <span class="cb-clock" id="matchClock">--:--</span>
               <div class="cb-header-strip cb-header-strip--field-call" id="fieldCallBanner">
                 <span class="cb-header-strip__label" id="fieldCallBannerLabel">Field Call</span>
@@ -787,6 +788,34 @@
               <div id="teamRostersColumnB">
                 <div id="teamRostersTeamB">Team B</div>
                 <ul id="teamRostersListB"></ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Match info banner -->
+        <div class="overlay-matchstatus-banner" id="matchStatusBanner" aria-live="polite">
+          <div class="matchstats-card matchstatus-card">
+            <div class="matchstatus-event" id="matchStatusEvent">Event</div>
+            <div class="matchstatus-header">
+              <div class="matchstatus-title">
+                <span class="matchstatus-team" id="matchStatusTeamA">Team A</span>
+                <span class="matchstatus-score" id="matchStatusScore">vs</span>
+                <span class="matchstatus-team" id="matchStatusTeamB">Team B</span>
+              </div>
+              <span class="matchstatus-chip" id="matchStatusPhase">Upcoming</span>
+            </div>
+            <div class="matchstatus-meta">
+              <div class="matchstatus-meta-row" id="matchStatusKickoffRow">
+                <span class="matchstatus-meta-label">Start</span>
+                <span class="matchstatus-meta-value" id="matchStatusKickoff">--</span>
+              </div>
+              <div class="matchstatus-meta-row matchstatus-venue-row">
+                <span class="matchstatus-meta-label">Venue -</span>
+                <span class="matchstatus-meta-value" id="matchStatusVenue">--</span>
+              </div>
+              <div class="matchstatus-meta-row matchstatus-weather-row" id="matchStatusWeatherRow">
+                <span class="matchstatus-meta-value" id="matchStatusWeather">--</span>
               </div>
             </div>
           </div>

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//tmp/**)",
+      "Bash(sed -n '/type: \"matchStatus\"/,/ts: Date.now/p' src/App.jsx)",
+      "Bash(grep -oE '\\\\.[a-zA-Z]+$')"
+    ]
+  }
+}

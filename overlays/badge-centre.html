@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <title>Badge Centre Overlay</title>
     <style>
-      @import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;600;700&display=swap");
+      @import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Semi+Condensed:wght@400;600;700&display=swap");
 
       *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -37,7 +37,7 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        font-family: "Space Grotesk", sans-serif;
+        font-family: "Barlow Semi Condensed", sans-serif;
       }
 
       /* Main bar */
@@ -280,7 +280,7 @@
         overflow: hidden;
         box-shadow: 0 12px 36px rgba(0,0,0,0.5);
         min-width: 560px;
-        font-family: "Space Grotesk", sans-serif;
+        font-family: "Barlow Semi Condensed", sans-serif;
       }
 
       #overlayBanner.is-active {
@@ -365,7 +365,7 @@
         display: block;
         width: 640px;
         transition: opacity 0.18s ease, transform 0.18s ease;
-        font-family: "Space Grotesk", sans-serif;
+        font-family: "Barlow Semi Condensed", sans-serif;
         z-index: 10;
       }
 
@@ -483,7 +483,7 @@
         display: block;
         width: 900px;
         transition: opacity 0.18s ease, transform 0.18s ease;
-        font-family: "Space Grotesk", sans-serif;
+        font-family: "Barlow Semi Condensed", sans-serif;
         z-index: 10;
       }
 
@@ -657,7 +657,7 @@
         </div>
 
         <!-- Required stubs -->
-        <span id="statusLabel" style="display:none">LIVE</span>
+        <span id="statusLabel" data-role="status-label" style="display:none">LIVE</span>
         <div id="eventLogo" style="display:none"></div>
         <div id="eventLogoFallback" style="display:none"></div>
         <div id="eventName" style="display:none"></div>        <div id="matchEventBanner" style="display:none"></div>

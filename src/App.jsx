@@ -5,6 +5,7 @@ import { MATCH_LOG_EVENT_CODES } from "./services/matchLogService";
 import { resolveEventCode } from "./lib/overlayEngine";
 import { ConfigView } from "./views/ConfigView";
 import { ControlView } from "./views/ControlView";
+import { readCachedWeatherForVenue, summarizeWeather, getVenueName } from "./components/WeatherCard";
 
 const BASE_PATH = import.meta.env.BASE_URL || "/";
 const NORMALIZED_BASE = BASE_PATH.endsWith("/") ? BASE_PATH : `${BASE_PATH}/`;
@@ -16,7 +17,9 @@ const MATCH_DETAIL_FIELDS = `
   score_b,
   start_time,
   starting_team_id,
+  venue_id,
   event:events!matches_event_id_fkey (id, name, type, start_date, end_date, location, rules, Status),
+  venue:venues!matches_venue_id_fkey (id, name, location, latitude, longitude),
   team_a:teams!matches_team_a_fkey (id, name, attributes),
   team_b:teams!matches_team_b_fkey (id, name, attributes)
 `;
@@ -29,6 +32,9 @@ const eventTypeCache = new Map();
 let eventTypeCacheLoaded = false;
 const eventCache = new Map();
 const rosterCache = new Map();
+
+const FINISHED_MATCH_STATUSES = new Set(["finished", "completed", "complete", "final", "ended", "done"]);
+const ACTIVE_EVENT_STATUSES = new Set(["live", "scheduled", "upcoming", "active"]);
 
 function readPersistedAppSettings() {
   try {
@@ -271,6 +277,7 @@ export default function App() {
   const [matchEventAutoFade, setMatchEventAutoFade] = useState(getInitialPopupAutoFade("matchEventAutoFade"));
   const [fieldCallAutoFade, setFieldCallAutoFade] = useState(getInitialPopupAutoFade("fieldCallAutoFade"));
   const [teamRostersAutoFade, setTeamRostersAutoFade] = useState(getInitialPopupAutoFade("teamRostersAutoFade"));
+  const [matchStatusAutoFade, setMatchStatusAutoFade] = useState(getInitialPopupAutoFade("matchStatusAutoFade"));
   const [bannerPlayerId, setBannerPlayerId] = useState(getInitialBannerPlayerId());
   const [bannerStatus, setBannerStatus] = useState("");
   const [matchEventButtons, setMatchEventButtons] = useState([]);
@@ -290,6 +297,16 @@ export default function App() {
   const [teamALogo, setTeamALogoState] = useState(() => readLogoDataUrl(LOGO_STORAGE_KEY_A));
   const [teamBLogo, setTeamBLogoState] = useState(() => readLogoDataUrl(LOGO_STORAGE_KEY_B));
   const [eventLogo, setEventLogoState] = useState(() => readLogoDataUrl(LOGO_STORAGE_KEY_EVENT));
+
+  const [selectedEventId, setSelectedEventId] = useState(
+    () => (readPersistedAppSettings().selectedEventId || "").toString().trim(),
+  );
+  const [activeEvents, setActiveEvents] = useState([]);
+  const [isLoadingEvents, setIsLoadingEvents] = useState(false);
+  const [eventsError, setEventsError] = useState("");
+  const [eventMatches, setEventMatches] = useState([]);
+  const [isLoadingEventMatches, setIsLoadingEventMatches] = useState(false);
+  const [eventMatchesError, setEventMatchesError] = useState("");
 
   const setTeamALogo = (dataUrl) => {
     saveLogoDataUrl(LOGO_STORAGE_KEY_A, dataUrl);
@@ -546,6 +563,46 @@ export default function App() {
     }
   };
 
+  const handleTriggerMatchStatus = async () => {
+    try {
+      const status = (matchDetails?.status || "").toString().trim().toLowerCase();
+      const phaseLabel =
+        ["finished", "completed", "complete", "final", "ended", "done"].includes(status)
+          ? "Full time"
+          : ["halftime", "half_time", "half-time", "ht", "break"].includes(status)
+            ? "Halftime"
+            : ["live", "in_progress", "playing", "running"].includes(status)
+              ? "Live"
+              : "Upcoming";
+
+      const venue = matchDetails?.venue;
+      const cachedWeather = readCachedWeatherForVenue(venue);
+      const weather = cachedWeather ? summarizeWeather(cachedWeather.weather) : null;
+
+      const payload = {
+        type: "matchStatus",
+        autoFade: matchStatusAutoFade,
+        phaseLabel,
+        teamAName: matchDetails?.team_a?.name || "Team A",
+        teamBName: matchDetails?.team_b?.name || "Team B",
+        scoreA: matchStats?.scoreA ?? matchDetails?.score_a ?? 0,
+        scoreB: matchStats?.scoreB ?? matchDetails?.score_b ?? 0,
+        startTime: matchDetails?.start_time || null,
+        venueName: getVenueName(venue) || matchDetails?.event?.location || eventDetails?.location || "",
+        eventName: eventDetails?.name || matchDetails?.event?.name || "",
+        weather,
+        ts: Date.now(),
+      };
+      await publishOverlayPayload(payload);
+      setBannerStatus("Match info overlay queued.");
+      window.setTimeout(() => setBannerStatus(""), 3000);
+    } catch (error) {
+      console.error("[App] handleTriggerMatchStatus failed", error);
+      setBannerStatus(`Match info error: ${error?.message || error}`);
+      window.setTimeout(() => setBannerStatus(""), 5000);
+    }
+  };
+
 
   const handleTriggerTimeout = async (team) => {
     if (!team) return;
@@ -663,9 +720,89 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    let isActive = true;
+
+    const loadActiveEvents = async () => {
+      setIsLoadingEvents(true);
+      setEventsError("");
+      const { data, error } = await supabase
+        .from("events")
+        .select("id, name, Status, start_date, end_date")
+        .order("start_date", { ascending: false });
+
+      if (!isActive) return;
+
+      if (error) {
+        setEventsError(error.message || "Unable to load events.");
+        setActiveEvents([]);
+        setIsLoadingEvents(false);
+        return;
+      }
+
+      const filtered = (data || []).filter((event) =>
+        ACTIVE_EVENT_STATUSES.has((event.Status || "").toString().trim().toLowerCase()),
+      );
+      setActiveEvents(filtered);
+      setIsLoadingEvents(false);
+    };
+
+    loadActiveEvents();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    if (!selectedEventId) {
+      setEventMatches([]);
+      setEventMatchesError("");
+      setIsLoadingEventMatches(false);
+      return () => {
+        isActive = false;
+      };
+    }
+
+    const loadEventMatches = async () => {
+      setIsLoadingEventMatches(true);
+      setEventMatchesError("");
+
+      const { data, error } = await supabase
+        .from("matches")
+        .select("id, status, start_time, team_a:teams!matches_team_a_fkey (name), team_b:teams!matches_team_b_fkey (name)")
+        .eq("event_id", selectedEventId)
+        .order("start_time", { ascending: true });
+
+      if (!isActive) return;
+
+      if (error) {
+        setEventMatchesError(error.message || "Unable to load matches.");
+        setEventMatches([]);
+        setIsLoadingEventMatches(false);
+        return;
+      }
+
+      const filtered = (data || []).filter(
+        (match) => !FINISHED_MATCH_STATUSES.has((match.status || "").toString().trim().toLowerCase()),
+      );
+      setEventMatches(filtered);
+      setIsLoadingEventMatches(false);
+    };
+
+    loadEventMatches();
+
+    return () => {
+      isActive = false;
+    };
+  }, [selectedEventId]);
+
+  useEffect(() => {
     const nextSettings = {
       overlayChoice,
       matchId: trimmedMatchId,
+      selectedEventId,
       isInitialized,
       teamATheme,
       teamBTheme,
@@ -682,6 +819,7 @@ export default function App() {
       matchEventAutoFade,
       fieldCallAutoFade,
       teamRostersAutoFade,
+      matchStatusAutoFade,
       bannerPlayerId,
     };
 
@@ -693,6 +831,7 @@ export default function App() {
   }, [
     overlayChoice,
     trimmedMatchId,
+    selectedEventId,
     isInitialized,
     teamATheme,
     teamBTheme,
@@ -709,6 +848,7 @@ export default function App() {
     matchEventAutoFade,
     fieldCallAutoFade,
     teamRostersAutoFade,
+    matchStatusAutoFade,
     bannerPlayerId,
   ]);
 
@@ -1212,6 +1352,14 @@ export default function App() {
             setOverlayChoice={setOverlayChoice}
             matchId={matchId}
             setMatchId={setMatchId}
+            selectedEventId={selectedEventId}
+            setSelectedEventId={setSelectedEventId}
+            activeEvents={activeEvents}
+            isLoadingEvents={isLoadingEvents}
+            eventsError={eventsError}
+            eventMatches={eventMatches}
+            isLoadingEventMatches={isLoadingEventMatches}
+            eventMatchesError={eventMatchesError}
             teamATheme={teamATheme}
             setTeamATheme={setTeamATheme}
             teamBTheme={teamBTheme}
@@ -1278,10 +1426,13 @@ export default function App() {
             setFieldCallAutoFade={setFieldCallAutoFade}
             teamRostersAutoFade={teamRostersAutoFade}
             setTeamRostersAutoFade={setTeamRostersAutoFade}
+            matchStatusAutoFade={matchStatusAutoFade}
+            setMatchStatusAutoFade={setMatchStatusAutoFade}
             breakChanceEnabled={breakChanceEnabled}
             setBreakChanceEnabled={setBreakChanceEnabled}
             handleTriggerBanner={handleTriggerBanner}
             handleTriggerMatchStats={handleTriggerMatchStats}
+            handleTriggerMatchStatus={handleTriggerMatchStatus}
             handleTriggerTeamRosters={handleTriggerTeamRosters}
             handleTriggerTimeout={handleTriggerTimeout}
             handleTriggerMatchEvent={handleTriggerMatchEvent}

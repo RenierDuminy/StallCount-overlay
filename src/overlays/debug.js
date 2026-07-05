@@ -74,6 +74,7 @@ let _lastTriggerKey = null;
 const BANNER_STATE_ELEMENTS = {
   playerStats:  "overlayBanner",
   matchStats:   "matchStatsBanner",
+  matchStatus:  "matchStatusBanner",
   teamRosters:  "teamRostersBanner",
   timeoutA:     "timeoutBannerA",
   timeoutB:     "timeoutBannerB",

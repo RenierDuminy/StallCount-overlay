@@ -53,6 +53,7 @@ export const STATUS_LABELS = {
 export const VALID_OVERLAY_PAYLOAD_TYPES = new Set([
   "playerStats",
   "matchStats",
+  "matchStatus",
   "teamRosters",
   "timeout",
   "fieldCall",

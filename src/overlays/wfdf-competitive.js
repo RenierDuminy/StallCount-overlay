@@ -30,7 +30,6 @@ const DEFAULT_LOGO_SRC = `${import.meta.env.BASE_URL}stallcount-logo.png`;
 const elements = {
   eventName: document.getElementById("eventName"),
   matchClock: document.getElementById("matchClock"),
-  statusLabel: document.getElementById("statusLabel"),
   overlayBar: document.getElementById("overlayBar"),
   logo: document.getElementById("eventLogo"),
   logoFallback: document.getElementById("eventLogoFallback"),
@@ -62,6 +61,17 @@ const elements = {
   matchStatsTurnoversB: document.getElementById("matchStatsTurnoversB"),
   matchStatsBlocksA: document.getElementById("matchStatsBlocksA"),
   matchStatsBlocksB: document.getElementById("matchStatsBlocksB"),
+  matchStatusBanner: document.getElementById("matchStatusBanner"),
+  matchStatusPhase: document.getElementById("matchStatusPhase"),
+  matchStatusTeamA: document.getElementById("matchStatusTeamA"),
+  matchStatusTeamB: document.getElementById("matchStatusTeamB"),
+  matchStatusScore: document.getElementById("matchStatusScore"),
+  matchStatusKickoff: document.getElementById("matchStatusKickoff"),
+  matchStatusKickoffRow: document.getElementById("matchStatusKickoffRow"),
+  matchStatusVenue: document.getElementById("matchStatusVenue"),
+  matchStatusEvent: document.getElementById("matchStatusEvent"),
+  matchStatusWeather: document.getElementById("matchStatusWeather"),
+  matchStatusWeatherRow: document.getElementById("matchStatusWeatherRow"),
   teamRostersBanner: document.getElementById("teamRostersBanner"),
   teamRostersTitle: document.getElementById("teamRostersTitle"),
   teamRostersColumnA: document.getElementById("teamRostersColumnA"),
@@ -471,6 +481,128 @@ function renderRosterList(element, players) {
   element.replaceChildren(...nextChildren);
 }
 
+// Match start_time is UTC; all matches play in CAT (UTC+2).
+function formatKickoffCat(value) {
+  if (!value) return "--";
+  const ms = new Date(value).getTime();
+  if (Number.isNaN(ms)) return String(value);
+  const shifted = new Date(ms + 2 * 60 * 60 * 1000);
+  const date = shifted.toLocaleDateString(undefined, { day: "2-digit", month: "short", timeZone: "UTC" });
+  const hh = String(shifted.getUTCHours()).padStart(2, "0");
+  const mm = String(shifted.getUTCMinutes()).padStart(2, "0");
+  return `${date}, ${hh}:${mm} CAT`;
+}
+
+// Only surface a metric when it is significant enough to matter for the match.
+const WEATHER_DISPLAY_THRESHOLDS = {
+  rainChancePct: 30,      // hide rain chance below this
+  humidityHighPct: 80,    // show humidity only when >= this ...
+  humidityLowPct: 25,     // ... or <= this (notably dry)
+  feelsLikeDeltaC: 3,     // show feels-like only when |feels - temp| >= this
+  sunWindowMin: 90,       // show sunrise/sunset only within this many minutes of start
+};
+
+// Format an epoch-ms instant as HH:MM in CAT (UTC+2) — matches match start_time basis.
+function formatSunCat(ms) {
+  if (!Number.isFinite(ms)) return "--";
+  const shifted = new Date(ms + 2 * 60 * 60 * 1000);
+  const hh = String(shifted.getUTCHours()).padStart(2, "0");
+  const mm = String(shifted.getUTCMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
+function formatWeatherLine(weather, startTime) {
+  if (!weather) return "";
+  const parts = [];
+  if (weather.temp != null) parts.push(`${weather.temp}${weather.tempUnit || "°"}`);
+  if (weather.condition) parts.push(weather.condition);
+  let line = parts.join(" ");
+
+  const t = WEATHER_DISPLAY_THRESHOLDS;
+  const extras = [];
+
+  // Wind: always shown (key ultimate metric).
+  if (weather.wind != null) extras.push(`${weather.wind} ${weather.windUnit || ""}`.trim() + " wind");
+
+  // Feels-like: only when it diverges from actual temp enough to notice.
+  if (
+    Number.isFinite(weather.feelsLike) &&
+    Number.isFinite(weather.temp) &&
+    Math.abs(weather.feelsLike - weather.temp) >= t.feelsLikeDeltaC
+  ) {
+    extras.push(`feels ${weather.feelsLike}${weather.tempUnit || "°"}`);
+  }
+
+  // Humidity: only when notably high or notably dry.
+  if (
+    Number.isFinite(weather.humidity) &&
+    (weather.humidity >= t.humidityHighPct || weather.humidity <= t.humidityLowPct)
+  ) {
+    extras.push(`${weather.humidity}% hum`);
+  }
+
+  // Rain chance: only when meaningful (no rain on a clear day).
+  if (Number.isFinite(weather.rainChance) && weather.rainChance >= t.rainChancePct) {
+    extras.push(`${weather.rainChance}% rain`);
+  }
+
+  // Sun time: only near dawn/dusk relative to match start. Never mid-day, only one shows.
+  const startMs = startTime ? new Date(startTime).getTime() : NaN;
+  if (Number.isFinite(startMs)) {
+    const windowMs = t.sunWindowMin * 60 * 1000;
+    if (Number.isFinite(weather.sunriseMs) && Math.abs(startMs - weather.sunriseMs) <= windowMs) {
+      extras.push(`🌅 ${formatSunCat(weather.sunriseMs)}`);
+    } else if (Number.isFinite(weather.sunsetMs) && Math.abs(startMs - weather.sunsetMs) <= windowMs) {
+      extras.push(`🌇 ${formatSunCat(weather.sunsetMs)}`);
+    }
+  }
+
+  if (extras.length) line += ` · ${extras.join(" · ")}`;
+  return line;
+}
+
+const MATCHSTATUS_CHIP_CLASS = {
+  Live: "matchstatus-chip--live",
+  Halftime: "matchstatus-chip--ht",
+  "Full time": "matchstatus-chip--after",
+  Upcoming: "matchstatus-chip--pre",
+};
+
+function applyMatchStatusPayload(payload) {
+  const phaseLabel = payload?.phaseLabel || "Match info";
+  // Upcoming = not yet started; everything else (Live/Halftime/Full time) has a score.
+  const started = phaseLabel !== "Upcoming";
+
+  if (elements.matchStatusPhase) {
+    elements.matchStatusPhase.textContent = phaseLabel;
+    elements.matchStatusPhase.className = "matchstatus-chip";
+    const chipClass = MATCHSTATUS_CHIP_CLASS[phaseLabel];
+    if (chipClass) elements.matchStatusPhase.classList.add(chipClass);
+  }
+  if (elements.matchStatusTeamA) elements.matchStatusTeamA.textContent = payload?.teamAName || "Team A";
+  if (elements.matchStatusTeamB) elements.matchStatusTeamB.textContent = payload?.teamBName || "Team B";
+  if (elements.matchStatusScore) {
+    if (started) {
+      const a = Number.isFinite(payload?.scoreA) ? payload.scoreA : 0;
+      const b = Number.isFinite(payload?.scoreB) ? payload.scoreB : 0;
+      elements.matchStatusScore.textContent = `${a} - ${b}`;
+      elements.matchStatusScore.classList.remove("matchstatus-score--pre");
+    } else {
+      // Pre-match: no meaningful score yet — show a muted "vs".
+      elements.matchStatusScore.textContent = "vs";
+      elements.matchStatusScore.classList.add("matchstatus-score--pre");
+    }
+  }
+  if (elements.matchStatusKickoff) elements.matchStatusKickoff.textContent = formatKickoffCat(payload?.startTime);
+  // Kickoff time only matters before the match starts.
+  if (elements.matchStatusKickoffRow) elements.matchStatusKickoffRow.classList.toggle("is-hidden", started);
+  if (elements.matchStatusVenue) elements.matchStatusVenue.textContent = payload?.venueName || "--";
+  if (elements.matchStatusEvent) elements.matchStatusEvent.textContent = payload?.eventName || "--";
+  const weatherLine = formatWeatherLine(payload?.weather, payload?.startTime);
+  if (elements.matchStatusWeather) elements.matchStatusWeather.textContent = weatherLine || "No weather data";
+  if (elements.matchStatusWeatherRow) elements.matchStatusWeatherRow.classList.toggle("is-hidden", !weatherLine);
+}
+
 function applyTeamRostersPayload(payload) {
   if (elements.teamRostersTitle && payload?.title) elements.teamRostersTitle.textContent = payload.title;
   if (elements.teamRostersTeamA && payload?.teamAName) elements.teamRostersTeamA.textContent = payload.teamAName;
@@ -511,14 +643,17 @@ function updateOverlay(payload) {
 
   if (elements.eventName) elements.eventName.textContent = eventName || "Event";
   if (elements.logoFallback) elements.logoFallback.textContent = getInitials(eventName);
-  if (elements.statusLabel) {
+  const statusLabelEls = document.querySelectorAll('[data-role="status-label"]');
+  if (statusLabelEls.length) {
     const resolvedLabel = statusLabel || "LIVE";
-    elements.statusLabel.textContent = resolvedLabel;
-    elements.statusLabel.classList.toggle("is-pull", resolvedLabel.startsWith("Pull:\n"));
-    elements.statusLabel.classList.toggle(
-      "is-stacked",
-      resolvedLabel === "1ST HALF" || resolvedLabel === "2ND HALF",
-    );
+    statusLabelEls.forEach((el) => {
+      el.textContent = resolvedLabel;
+      el.classList.toggle("is-pull", resolvedLabel.startsWith("Pull:\n"));
+      el.classList.toggle(
+        "is-stacked",
+        resolvedLabel === "1ST HALF" || resolvedLabel === "2ND HALF",
+      );
+    });
   }
   if (elements.matchClock) elements.matchClock.textContent = matchClock;
   if (elements.matchClock?.parentElement) {
@@ -543,6 +678,8 @@ let activeMatchStatsKey = null;
 let matchStatsBannerHandle = null;
 let activeTeamRostersKey = null;
 let teamRostersBannerHandle = null;
+let activeMatchStatusKey = null;
+let matchStatusBannerHandle = null;
 let activeTimeoutKey = null;
 let timeoutBannerHandle = null;
 let activeBreakChanceKeyA = null;
@@ -739,6 +876,31 @@ function showTeamRostersBanner(payload) {
 }
 
 
+function showMatchStatusBanner(payload) {
+  if (!elements.matchStatusBanner) return;
+  const payloadKey = getOverlayPayloadKey(payload);
+  const autoFade = isAutoFadeEnabled(payload);
+
+  if (!autoFade && activeMatchStatusKey === payloadKey && elements.matchStatusBanner.classList.contains("is-active")) {
+    matchStatusBannerHandle?.cancel();
+    activeMatchStatusKey = null;
+    return;
+  }
+
+  matchStatusBannerHandle?.cancel();
+  activeMatchStatusKey = payloadKey;
+
+  matchStatusBannerHandle = manageBannerState(payload, {
+    targets: [{
+      element: elements.matchStatusBanner,
+      onPrepare: () => applyMatchStatusPayload(payload),
+    }],
+    timeout: autoFade ? 10000 : null,
+  });
+
+  if (!autoFade) elements.matchStatusBanner.classList.add("is-persistent");
+}
+
 function showTimeoutBanner(team, payload = null) {
   const target = team === "A" ? elements.timeoutA : team === "B" ? elements.timeoutB : null;
   if (!target) return;
@@ -923,6 +1085,7 @@ function syncHalftimeBanner() {
 function handleOverlayBannerPayload(payload) {
   if (payload?.type === "playerStats") { showBanner(payload); return; }
   if (payload?.type === "matchStats") { showMatchStatsBanner(payload); return; }
+  if (payload?.type === "matchStatus") { showMatchStatusBanner(payload); return; }
   if (payload?.type === "teamRosters") { showTeamRostersBanner(payload); return; }
   if (payload?.type === "timeout") {
     const team = (payload.team || "").toString().trim().toUpperCase();
@@ -989,6 +1152,7 @@ window.addEventListener("storage", (event) => {
       if (prev.playerStatsAutoFade === false)  _dismissIfAutoFadeFlippedOn(settings.playerStatsAutoFade, playerStatsBannerHandle, () => { playerStatsBannerHandle = null; activePlayerStatsKey = null; });
       if (prev.matchStatsAutoFade === false)   _dismissIfAutoFadeFlippedOn(settings.matchStatsAutoFade, matchStatsBannerHandle, () => { matchStatsBannerHandle = null; activeMatchStatsKey = null; });
       if (prev.teamRostersAutoFade === false)  _dismissIfAutoFadeFlippedOn(settings.teamRostersAutoFade, teamRostersBannerHandle, () => { teamRostersBannerHandle = null; activeTeamRostersKey = null; });
+      if (prev.matchStatusAutoFade === false)  _dismissIfAutoFadeFlippedOn(settings.matchStatusAutoFade, matchStatusBannerHandle, () => { matchStatusBannerHandle = null; activeMatchStatusKey = null; });
       if (prev.timeoutAutoFade === false)      _dismissIfAutoFadeFlippedOn(settings.timeoutAutoFade, timeoutBannerHandle, () => { timeoutBannerHandle = null; activeTimeoutKey = null; });
       if (prev.fieldCallAutoFade === false)    _dismissIfAutoFadeFlippedOn(settings.fieldCallAutoFade, fieldCallBannerHandle, () => { fieldCallBannerHandle = null; activeFieldCallKey = null; });
       if (prev.matchEventAutoFade === false)   _dismissIfAutoFadeFlippedOn(settings.matchEventAutoFade, matchEventBannerHandle, () => { matchEventBannerHandle = null; activeMatchEventKey = null; });
@@ -997,6 +1161,7 @@ window.addEventListener("storage", (event) => {
       playerStatsAutoFade: settings.playerStatsAutoFade,
       matchStatsAutoFade: settings.matchStatsAutoFade,
       teamRostersAutoFade: settings.teamRostersAutoFade,
+      matchStatusAutoFade: settings.matchStatusAutoFade,
       timeoutAutoFade: settings.timeoutAutoFade,
       fieldCallAutoFade: settings.fieldCallAutoFade,
       matchEventAutoFade: settings.matchEventAutoFade,

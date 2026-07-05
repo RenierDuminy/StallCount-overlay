@@ -7,6 +7,10 @@ export default defineConfig({
   build: {
     outDir: "dist",
     rollupOptions: {
+      // Vite 7's html-inline-proxy plugin races when several HTML entries with
+      // inline <style> blocks are processed in parallel, losing the proxy
+      // module and failing the build. Serializing file ops avoids the race.
+      maxParallelFileOps: 1,
       input: {
         app: fileURLToPath(new URL("./index.html", import.meta.url)),
         overlayDebug: fileURLToPath(new URL("./overlay-debug.html", import.meta.url)),

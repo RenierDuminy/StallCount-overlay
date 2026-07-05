@@ -28,11 +28,26 @@ function formatDateTime(value) {
   return `${parsed.toLocaleDateString()} ${parsed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
 }
 
+function formatMatchOptionLabel(match) {
+  const teamAName = match.team_a?.name || "Team A";
+  const teamBName = match.team_b?.name || "Team B";
+  const when = formatDateTime(match.start_time);
+  return `${teamAName} vs ${teamBName} — ${when}`;
+}
+
 export function ConfigView({
   overlayChoice,
   setOverlayChoice,
   matchId,
   setMatchId,
+  selectedEventId,
+  setSelectedEventId,
+  activeEvents,
+  isLoadingEvents,
+  eventsError,
+  eventMatches,
+  isLoadingEventMatches,
+  eventMatchesError,
   teamATheme,
   setTeamATheme,
   teamBTheme,
@@ -113,7 +128,56 @@ export function ConfigView({
               </Select>
             </Field>
 
-            <Field label="Match ID" action={hasMatchId ? "✓" : null}>
+            <Field label="Event">
+              <Select
+                value={selectedEventId}
+                onChange={(event) => {
+                  setSelectedEventId(event.target.value);
+                  setMatchId("");
+                }}
+                disabled={configLocked}
+              >
+                <option value="">
+                  {isLoadingEvents ? "Loading events…" : "Select an event"}
+                </option>
+                {activeEvents.map((event) => (
+                  <option key={event.id} value={event.id}>
+                    {event.name}
+                  </option>
+                ))}
+              </Select>
+              {eventsError ? (
+                <p className="overlay-data-state overlay-data-state--error">{eventsError}</p>
+              ) : null}
+            </Field>
+
+            <Field label="Match">
+              <Select
+                value={matchId}
+                onChange={(event) => setMatchId(event.target.value)}
+                disabled={configLocked || !selectedEventId}
+              >
+                <option value="">
+                  {!selectedEventId
+                    ? "Select an event first"
+                    : isLoadingEventMatches
+                      ? "Loading matches…"
+                      : eventMatches.length
+                        ? "Select a match"
+                        : "No active matches"}
+                </option>
+                {eventMatches.map((match) => (
+                  <option key={match.id} value={match.id}>
+                    {formatMatchOptionLabel(match)}
+                  </option>
+                ))}
+              </Select>
+              {eventMatchesError ? (
+                <p className="overlay-data-state overlay-data-state--error">{eventMatchesError}</p>
+              ) : null}
+            </Field>
+
+            <Field label="Match ID (manual override / testing)" action={hasMatchId ? "✓" : null}>
               <Input
                 value={matchId}
                 onChange={(event) => setMatchId(event.target.value)}

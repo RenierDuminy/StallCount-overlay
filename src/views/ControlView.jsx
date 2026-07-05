@@ -1,6 +1,12 @@
 import { useMemo, useState, useCallback, useEffect } from "react";
 import { Card, Chip, Field, Select, SectionHeader } from "../components/ui/primitives";
 import { MatchEventCard } from "../components/eventCards";
+import {
+  WeatherCard,
+  readCachedWeatherForVenue,
+  summarizeWeather,
+  getVenueName,
+} from "../components/WeatherCard";
 import { MATCH_LOG_EVENT_CODES } from "../services/matchLogService";
 
 function TimedButton({ children, onClick, durationSeconds, disabled, autoFade = true, className = "" }) {
@@ -54,12 +60,28 @@ function TimedButton({ children, onClick, durationSeconds, disabled, autoFade = 
 const BUTTON_DURATION_SECONDS = {
   playerStats: 6,
   matchStats: 8,
+  matchStatus: 10,
   teamRosters: 10,
   timeout: 4,
   fieldCall: 4,
   matchEvent: 5,
   breakChance: 4,
 };
+
+// Human-readable phase for the match-status card: before / halftime / after.
+function describeMatchPhase(status) {
+  const normalized = (status || "").toString().trim().toLowerCase();
+  if (["finished", "completed", "complete", "final", "ended", "done"].includes(normalized)) {
+    return { phase: "after", label: "Full time" };
+  }
+  if (["halftime", "half_time", "half-time", "ht", "break"].includes(normalized)) {
+    return { phase: "ht", label: "Halftime" };
+  }
+  if (["live", "in_progress", "playing", "running"].includes(normalized)) {
+    return { phase: "live", label: "Live" };
+  }
+  return { phase: "before", label: "Upcoming" };
+}
 const FIELD_CALL_OPTIONS = ["Pick", "Violation", "Foul", "Injury"];
 
 function formatDate(value) {
@@ -72,6 +94,22 @@ function formatDate(value) {
 function formatStatValue(value) {
   if (value === null || value === undefined || value === "") return "--";
   return value;
+}
+
+// Match start_time is stored UTC; all matches play in CAT (UTC+2).
+function formatKickoffCat(value) {
+  if (!value) return "--";
+  const ms = new Date(value).getTime();
+  if (Number.isNaN(ms)) return String(value);
+  const shifted = new Date(ms + 2 * 60 * 60 * 1000);
+  const date = shifted.toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "short",
+    timeZone: "UTC",
+  });
+  const hh = String(shifted.getUTCHours()).padStart(2, "0");
+  const mm = String(shifted.getUTCMinutes()).padStart(2, "0");
+  return `${date}, ${hh}:${mm} CAT`;
 }
 
 function renderRulesValue(value, keyPrefix = "", depth = 0) {
@@ -164,10 +202,13 @@ export function ControlView({
   setFieldCallAutoFade,
   teamRostersAutoFade,
   setTeamRostersAutoFade,
+  matchStatusAutoFade,
+  setMatchStatusAutoFade,
   breakChanceEnabled,
   setBreakChanceEnabled,
   handleTriggerBanner,
   handleTriggerMatchStats,
+  handleTriggerMatchStatus,
   handleTriggerTeamRosters,
   handleTriggerTimeout,
   handleTriggerMatchEvent,
@@ -204,6 +245,14 @@ export function ControlView({
     return { scoreOnly, stoppage, halftimeEvent };
   }, [matchEventButtons]);
 
+  const venue = matchDetails?.venue;
+  const matchPhase = describeMatchPhase(matchDetails?.status);
+  const statusWeather = useMemo(() => {
+    const cached = readCachedWeatherForVenue(venue);
+    return cached ? summarizeWeather(cached.weather) : null;
+  }, [venue, bannerStatus]);
+  const venueLabel = getVenueName(venue) || matchDetails?.event?.location || eventDetails?.location;
+
   return (
     <>
       <header className="overlay-header overlay-header--minimal overlay-header--compact overlay-header--with-actions">
@@ -238,6 +287,77 @@ export function ControlView({
         {showControl ? (
           <div className="overlay-control-layout">
             <div className="overlay-control-stack">
+              <Card className="overlay-card overlay-matchstatus-card">
+                <SectionHeader
+                  title="Match info"
+                  description="On-air card with fixture, venue, and weather. Show before, at halftime, or after the match."
+                  action={
+                    <>
+                      {renderAutoFadeToggle(matchStatusAutoFade, setMatchStatusAutoFade)}
+                      <TimedButton
+                        durationSeconds={BUTTON_DURATION_SECONDS.matchStatus}
+                        autoFade={matchStatusAutoFade}
+                        onClick={handleTriggerMatchStatus}
+                      >
+                        Show match info
+                      </TimedButton>
+                    </>
+                  }
+                  divider
+                />
+
+                <div className="overlay-matchstatus-preview">
+                  <div className="overlay-matchstatus-preview__phase">
+                    <span className={`overlay-matchstatus-badge is-${matchPhase.phase}`}>
+                      {matchPhase.label}
+                    </span>
+                    <span className="overlay-matchstatus-score">
+                      {formatStatValue(matchStats?.scoreA)} – {formatStatValue(matchStats?.scoreB)}
+                    </span>
+                  </div>
+
+                  <div className="overlay-matchstatus-teams">
+                    {matchDetails?.team_a?.name || "Team A"}
+                    <span className="overlay-matchstatus-vs"> vs </span>
+                    {matchDetails?.team_b?.name || "Team B"}
+                  </div>
+
+                  <dl className="overlay-matchstatus-meta">
+                    <div>
+                      <dt>Kickoff</dt>
+                      <dd>{formatKickoffCat(matchDetails?.start_time)}</dd>
+                    </div>
+                    <div>
+                      <dt>Venue</dt>
+                      <dd>{venueLabel || "--"}</dd>
+                    </div>
+                    <div>
+                      <dt>Event</dt>
+                      <dd>{eventDetails?.name || matchDetails?.event?.name || "--"}</dd>
+                    </div>
+                    <div>
+                      <dt>Weather</dt>
+                      <dd>
+                        {statusWeather ? (
+                          <>
+                            {statusWeather.icon}{" "}
+                            {statusWeather.temp != null
+                              ? `${statusWeather.temp}${statusWeather.tempUnit}`
+                              : ""}{" "}
+                            {statusWeather.condition}
+                            {statusWeather.wind != null
+                              ? ` · ${statusWeather.wind} ${statusWeather.windUnit} wind`.trimEnd()
+                              : ""}
+                          </>
+                        ) : (
+                          "No weather loaded — refresh the weather card first."
+                        )}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+              </Card>
+
               <Card className="overlay-card overlay-banner-card">
                 <SectionHeader
                   title="Banners"
@@ -246,6 +366,13 @@ export function ControlView({
                 />
 
                 <div className="overlay-banner-grid">
+                  <WeatherCard
+                    venue={matchDetails?.venue}
+                    startTime={matchDetails?.start_time}
+                    matchStatus={matchDetails?.status}
+                    eventStatus={matchDetails?.event?.Status ?? eventDetails?.Status}
+                  />
+
                   <div className="overlay-banner-block">
                     <div className="overlay-banner-block__header">
                       <div className="overlay-banner-block__title">Player stats</div>
