@@ -38,8 +38,8 @@
       }
     </style>
     <script>
-      document.head.insertAdjacentHTML('beforeend', '<style>' +
-        '#canvas{outline:1px solid rgba(255,255,255,0.4);background-image:repeating-linear-gradient(45deg,rgba(255,255,255,0.03) 0px,rgba(255,255,255,0.03) 1px,transparent 1px,transparent 12px),repeating-linear-gradient(-45deg,rgba(255,255,255,0.03) 0px,rgba(255,255,255,0.03) 1px,transparent 1px,transparent 12px)}' +
+      if (new URLSearchParams(window.location.search).has('preview')) document.head.insertAdjacentHTML('beforeend', '<style>' +
+        '#canvas{outline:1px solid rgba(255,255,255,0.4);background-image:repeating-linear-gradient(45deg,rgba(255,255,255,0.03) 0px,rgba(255,255,255,0.03) 1px,transparent 1px,transparent 12px),repeating-linear-gradient(-45deg,rgba(255,255,255,0.03) 0px,rgba(255,255,255,0.03) 1px,transparent 1px,transparent 12px),url(/overlay-demo.jpg);background-size:auto,auto,cover;background-position:0 0,0 0,center}' +
       '</style>');
     </script>
   </head>

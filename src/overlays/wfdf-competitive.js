@@ -70,6 +70,7 @@ const elements = {
   matchStatusKickoffRow: document.getElementById("matchStatusKickoffRow"),
   matchStatusVenue: document.getElementById("matchStatusVenue"),
   matchStatusEvent: document.getElementById("matchStatusEvent"),
+  matchStatusLogo: document.getElementById("matchStatusLogo"),
   matchStatusWeather: document.getElementById("matchStatusWeather"),
   matchStatusWeatherRow: document.getElementById("matchStatusWeatherRow"),
   teamRostersBanner: document.getElementById("teamRostersBanner"),
@@ -82,6 +83,8 @@ const elements = {
   teamRostersListB: document.getElementById("teamRostersListB"),
   timeoutA: document.getElementById("timeoutBannerA"),
   timeoutB: document.getElementById("timeoutBannerB"),
+  timeoutTeamShortA: document.getElementById("timeoutTeamShortA"),
+  timeoutTeamShortB: document.getElementById("timeoutTeamShortB"),
   breakChanceA: document.getElementById("breakChanceBannerA"),
   breakChanceB: document.getElementById("breakChanceBannerB"),
   fieldCallBanner: document.getElementById("fieldCallBanner"),
@@ -490,7 +493,7 @@ function formatKickoffCat(value) {
   const date = shifted.toLocaleDateString(undefined, { day: "2-digit", month: "short", timeZone: "UTC" });
   const hh = String(shifted.getUTCHours()).padStart(2, "0");
   const mm = String(shifted.getUTCMinutes()).padStart(2, "0");
-  return `${date}, ${hh}:${mm} CAT`;
+  return `${date}, ${hh}:${mm}`;
 }
 
 // Only surface a metric when it is significant enough to matter for the match.
@@ -498,7 +501,6 @@ const WEATHER_DISPLAY_THRESHOLDS = {
   rainChancePct: 30,      // hide rain chance below this
   humidityHighPct: 80,    // show humidity only when >= this ...
   humidityLowPct: 25,     // ... or <= this (notably dry)
-  feelsLikeDeltaC: 3,     // show feels-like only when |feels - temp| >= this
   sunWindowMin: 90,       // show sunrise/sunset only within this many minutes of start
 };
 
@@ -514,7 +516,9 @@ function formatSunCat(ms) {
 function formatWeatherLine(weather, startTime) {
   if (!weather) return "";
   const parts = [];
-  if (weather.temp != null) parts.push(`${weather.temp}${weather.tempUnit || "°"}`);
+  // Lead with feels-like (apparent) temperature; fall back to actual temp.
+  const displayTemp = Number.isFinite(weather.feelsLike) ? weather.feelsLike : weather.temp;
+  if (displayTemp != null) parts.push(`${displayTemp}${weather.tempUnit || "°"} feels like`);
   if (weather.condition) parts.push(weather.condition);
   let line = parts.join(" ");
 
@@ -523,15 +527,6 @@ function formatWeatherLine(weather, startTime) {
 
   // Wind: always shown (key ultimate metric).
   if (weather.wind != null) extras.push(`${weather.wind} ${weather.windUnit || ""}`.trim() + " wind");
-
-  // Feels-like: only when it diverges from actual temp enough to notice.
-  if (
-    Number.isFinite(weather.feelsLike) &&
-    Number.isFinite(weather.temp) &&
-    Math.abs(weather.feelsLike - weather.temp) >= t.feelsLikeDeltaC
-  ) {
-    extras.push(`feels ${weather.feelsLike}${weather.tempUnit || "°"}`);
-  }
 
   // Humidity: only when notably high or notably dry.
   if (
@@ -638,8 +633,8 @@ function updateOverlay(payload) {
     clockText ||
     (hideClock ? "" : formatClock(scoreboard?.clock));
 
-  const customEventLogo = (() => { try { return localStorage.getItem("stallcount:logo-event") || ""; } catch { return ""; } })();
-  const resolvedLogo = logo || customEventLogo || DEFAULT_LOGO_SRC;
+  _scoreboardLogo = logo || "";
+  const resolvedLogo = resolveEventLogo();
 
   if (elements.eventName) elements.eventName.textContent = eventName || "Event";
   if (elements.logoFallback) elements.logoFallback.textContent = getInitials(eventName);
@@ -662,12 +657,39 @@ function updateOverlay(payload) {
   if (elements.overlayBar) elements.overlayBar.classList.toggle("is-clock-hidden", hideClock);
   if (elements.teamAName) elements.teamAName.textContent = teamAName;
   if (elements.teamBName) elements.teamBName.textContent = teamBName;
+  if (elements.timeoutTeamShortA) elements.timeoutTeamShortA.textContent = formatTeamShortName(match.team_a);
+  if (elements.timeoutTeamShortB) elements.timeoutTeamShortB.textContent = formatTeamShortName(match.team_b);
   if (elements.scoreA) elements.scoreA.textContent = Number.isFinite(scoreA) ? scoreA : 0;
   if (elements.scoreB) elements.scoreB.textContent = Number.isFinite(scoreB) ? scoreB : 0;
   applyTeamColors(elements.teamABox, teamAColors);
   applyTeamColors(elements.teamBBox, teamBColors);
   updateMatchStatsHeader({ teamAName, teamBName, scoreA, scoreB, teamAColors, teamBColors });
-  applyLogo(resolvedLogo);
+  applyEventLogo(resolvedLogo);
+}
+
+// ─── Event logo ───────────────────────────────────────────────────────────────
+
+const EVENT_LOGO_STORAGE_KEY = "stallcount:logo-event";
+let _scoreboardLogo = "";
+
+// An uploaded tournament logo overrides the scoreboard's logo.
+function resolveEventLogo() {
+  let customEventLogo = "";
+  try { customEventLogo = localStorage.getItem(EVENT_LOGO_STORAGE_KEY) || ""; } catch { /* storage unavailable */ }
+  return customEventLogo || _scoreboardLogo || DEFAULT_LOGO_SRC;
+}
+
+function applyEventLogo(src) {
+  applyLogo(src);
+  if (elements.matchStatusLogo) {
+    if (src) {
+      elements.matchStatusLogo.src = src;
+      elements.matchStatusLogo.classList.remove("is-hidden");
+    } else {
+      elements.matchStatusLogo.removeAttribute("src");
+      elements.matchStatusLogo.classList.add("is-hidden");
+    }
+  }
 }
 
 // ─── Banner active-key trackers ───────────────────────────────────────────────
@@ -1176,6 +1198,11 @@ window.addEventListener("storage", (event) => {
       // Turned on — re-evaluate against cached logs
       _syncBreakChance(_cachedMatchLogs, getCurrentMatch());
     }
+    return;
+  }
+
+  if (event.key === EVENT_LOGO_STORAGE_KEY) {
+    applyEventLogo(resolveEventLogo());
     return;
   }
 

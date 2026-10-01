@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Corner Box Overlay (Bottom-L)</title>
+    <title>CTFDA Overlay</title>
     <style>
       @import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Semi+Condensed:wght@400;600;700&display=swap");
 
@@ -27,259 +27,204 @@
         transform-origin: top left;
       }
 
-      /* ── Corner scoreboard ── */
-      .cb-wrap {
+      /* ── CTFDA scoreboard ── */
+      .ce-wrap {
+        --ce-accent: #2f2fbf;
+        --ce-height: 86px;
+        --ce-radius: 15px;
+        --ce-tuck: calc(var(--ce-radius) * 2); /* how far call strips sit under the score box */
         position: absolute;
         z-index: 2;
-        bottom: 32px;
+        top: 32px;
         left: 32px;
         display: flex;
-        flex-direction: column-reverse;
-        align-items: stretch;
-      }
-
-      .cb-root {
-        width: 300px;
+        flex-direction: column;
+        align-items: flex-start;
         font-family: "Barlow Semi Condensed", sans-serif;
-        background: #111111;
-        color: #ffffff;
-        box-shadow: 0 12px 32px rgba(0,0,0,0.55);
-        overflow: visible;
-        flex-shrink: 0;
       }
 
-      /* Top strip: period + clock */
-      .cb-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 8px 14px;
-        background: #1a1a1a;
-        border-bottom: 1px solid #333333;
+      /* White tabs above (event name) and below (organiser) the box */
+      .ce-tab {
         position: relative;
-      }
-
-      /* ── Field call / event strips — slide right from status bar ── */
-      .cb-header-strip {
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 100%;
-        display: flex;
-        align-items: center;
-        padding: 0 16px;
-        background: #111111;
-        color: rgba(255,255,255,0.7);
+        z-index: 1; /* keep above .ce-main's shadow so the white stays pure */
+        margin-left: calc(var(--ce-height) - 12px);
+        padding: 2px 22px;
+        background: #ffffff;
+        color: #000000;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        line-height: 1.2;
+        text-transform: uppercase;
         white-space: nowrap;
-        box-shadow: 4px 0 16px rgba(0,0,0,0.4);
-        pointer-events: none;
-        opacity: 0;
-        transform: translateX(-8px);
-        transition: opacity 0.18s ease, transform 0.18s ease;
-        gap: 10px;
+        box-shadow: 0 6px 16px rgba(0,0,0,0.35);
       }
 
-      .cb-header-strip.is-active,
-      .cb-header-strip.is-persistent {
-        opacity: 1;
-        transform: translateX(0);
-      }
-
-      .cb-header-strip__label {
-        font-size: 18px;
-        font-weight: 700;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-      }
-
-      .cb-period {
-        font-size: 14px;
-        font-weight: 700;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        color: rgba(255,255,255,0.7);
-      }
-
-      .cb-clock {
-        font-family: "Bebas Neue", sans-serif;
-        font-size: 32px;
-        letter-spacing: 0.12em;
-        color: #ffffff;
-        line-height: 1;
-      }
-
-      /* Team rows */
-      .cb-teams {
-        display: grid;
-        grid-template-columns: 52px 1fr 72px;
+      .ce-main {
+        position: relative;
+        display: flex;
         align-items: stretch;
-        background: var(--team-bg, #1a1a1a);
-        color: var(--team-text, #ffffff);
-        position: relative; /* anchor for the absolute timeout strip */
+        height: var(--ce-height);
+        background: #0b0b0b;
+        color: #ffffff;
+        border-radius: var(--ce-radius);
+        box-shadow: 0 12px 32px rgba(0,0,0,0.55);
       }
 
-      .cb-logo-cell {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 1.3px;
-      }
-
-      .cb-logo-circle {
-        width: 100%;
-        aspect-ratio: 1;
-        border-radius: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
+      /* Event logo */
+      .ce-logo {
+        width: var(--ce-height);
         flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 8px;
       }
 
-      .cb-logo-circle img {
+      .ce-logo img {
         width: 100%;
         height: 100%;
         object-fit: contain;
         display: none;
       }
 
-      .cb-logo-circle.has-image img { display: block; }
+      .ce-logo.has-image img { display: block; }
 
-      .cb-logo-fallback {
-        font-size: 10px;
-        font-weight: 700;
-        color: var(--team-text, #ffffff);
-        letter-spacing: 0.05em;
-        text-align: center;
-        line-height: 1;
+      .ce-logo-fallback {
+        font-family: "Bebas Neue", sans-serif;
+        font-size: 26px;
+        letter-spacing: 0.06em;
+        color: #ffffff;
       }
 
-      .cb-logo-circle.has-image .cb-logo-fallback { display: none; }
+      .ce-logo.has-image .ce-logo-fallback { display: none; }
 
-      .cb-name-cell {
+      /* Team rows */
+      .ce-teams {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 2px;
+        min-width: 260px;
+        padding: 0 22px 0 6px;
+      }
+
+      .ce-team {
         display: flex;
         align-items: center;
-        padding: 0 10px;
-        font-size: 20px;
-        font-weight: 700;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: var(--team-text, #ffffff);
-        min-height: 52px;
+        gap: 8px;
       }
 
-      .cb-score-cell {
+      .ce-swatch {
+        width: 10px;
+        height: 26px;
+        flex-shrink: 0;
+        background: var(--team-bg, #6b7280);
+        box-shadow: 0 0 0 1px rgba(255,255,255,0.35);
+      }
+
+      .ce-team-name {
+        font-size: 30px;
+        font-weight: 700;
+        line-height: 1.1;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
+      }
+
+      /* Score column */
+      .ce-scores {
         display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 2px;
+        min-width: 66px;
+        padding: 0 15.4px;
+        background: var(--ce-accent);
+        font-family: "Bebas Neue", sans-serif;
+        font-size: 38px;
+        line-height: 1;
+        color: #ffffff;
+        border-radius: 0 var(--ce-radius) var(--ce-radius) 0;
+      }
+
+      /* ── Call strips: full box height, slide out from behind the scores, side by side ── */
+      .ce-strips {
+        position: absolute;
+        z-index: -1; /* behind .ce-main (.ce-wrap is the stacking context) */
+        top: 0;
+        bottom: 0;
+        left: calc(100% - var(--ce-tuck)); /* start under the score box so its rounded corners stay backed */
+        display: flex;
+        align-items: stretch;
+        pointer-events: none;
+        border-radius: 0 var(--ce-radius) var(--ce-radius) 0;
+        overflow: hidden;
+        filter: drop-shadow(4px 0 10px rgba(0,0,0,0.4));
+      }
+
+      /* Width grows from 0 with the label pinned to the right edge,
+         so the strip appears to slide out from behind the box (and back in). */
+      .ce-strip {
+        display: flex;
+        align-items: stretch;
+        justify-content: flex-end;
+        max-width: 0;
+        overflow: hidden;
+        background: #111111;
+        color: #ffffff;
+        transition: max-width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .ce-strip.is-active,
+      .ce-strip.is-persistent {
+        max-width: calc(420px + var(--ce-tuck));
+      }
+
+      .ce-strip + .ce-strip .ce-strip__label {
+        border-left: 1px solid rgba(255,255,255,0.15);
+      }
+
+      .ce-strip__label {
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+        /* extra left padding: the first --ce-tuck px sit under the box */
+        padding: 0 22px 0 calc(22px + var(--ce-tuck));
+        white-space: nowrap;
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .ce-strip__label--stacked {
+        flex-direction: column;
         align-items: center;
         justify-content: center;
-        font-family: "Bebas Neue", sans-serif;
-        font-size: 44px;
-        letter-spacing: 0.04em;
-        color: var(--team-text, #ffffff);
-        padding: 6px 10px;
+        line-height: 1.05;
       }
 
-      /* ── Timeout strip — attached to the right edge of the calling team's row ── */
-      .cb-timeout-strip {
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 100%;           /* flush against the right edge of the scoreboard */
-        display: flex;
-        align-items: center;
-        padding: 0 16px;
+      .ce-strip__sub {
+        font-size: 19px;
+        letter-spacing: 0.12em;
+        opacity: 0.85;
+      }
+
+      .ce-strip--timeout {
         background: var(--team-bg, #1a1a1a);
         color: var(--team-text, #ffffff);
-        white-space: nowrap;
-        box-shadow: 4px 0 16px rgba(0,0,0,0.4);
-        pointer-events: none;
-        opacity: 0;
-        transform: translateX(-8px);
-        transition: opacity 0.18s ease, transform 0.18s ease;
       }
 
-      .cb-timeout-strip.is-active,
-      .cb-timeout-strip.is-persistent {
-        opacity: 1;
-        transform: translateX(0);
+      .ce-strip--break { background: #dc2626; color: #ffffff; }
+
+      /* Single break-chance banner: #breakChanceBannerA is the visible one and
+         opens when either team's break chance is active; B is only a trigger. */
+      #breakChanceBannerB { display: none; }
+      #breakChanceBannerA.is-shared-active {
+        max-width: calc(420px + var(--ce-tuck));
       }
-
-      .cb-timeout-strip__label {
-        font-size: 18px;
-        font-weight: 700;
-        letter-spacing: 0.2em;
-        text-transform: uppercase;
-      }
-
-      /* ── Break chance strip — same pattern as timeout, red bg ── */
-      .cb-break-strip {
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 100%;
-        display: flex;
-        align-items: center;
-        padding: 0 16px;
-        background: #dc2626;
-        color: #ffffff;
-        white-space: normal;
-        line-height: 1.15;
-        box-shadow: 4px 0 16px rgba(0,0,0,0.4);
-        pointer-events: none;
-        opacity: 0;
-        transform: translateX(-8px);
-        transition: opacity 0.18s ease, transform 0.18s ease;
-      }
-
-      .cb-break-strip.is-active,
-      .cb-break-strip.is-persistent {
-        opacity: 1;
-        transform: translateX(0);
-      }
-
-      .cb-break-strip__label {
-        font-size: 18px;
-        font-weight: 700;
-        letter-spacing: 0.2em;
-        text-transform: uppercase;
-      }
-
-
-      /* ── Event/field-call strips — appear below scoreboard, styled like status header ── */
-      .cb-pills {
-        display: contents; /* children render directly inside .cb-wrap column */
-      }
-
-      .cb-pill {
-        display: none;
-        align-items: center;
-        gap: 10px;
-        padding: 8px 14px;
-        background: #1a1a1a;
-        border-bottom: 1px solid #333333;
-        white-space: nowrap;
-        font-family: "Barlow Semi Condensed", sans-serif;
-      }
-
-      .cb-pill.is-active { display: flex; }
-
-      .cb-pill__dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        flex-shrink: 0;
-      }
-
-      .cb-pill__label {
-        font-size: 18px;
-        font-weight: 700;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        color: rgba(255,255,255,0.7);
-      }
-
-      .cb-pill--field-call .cb-pill__dot  { background: #f59e0b; }
-      .cb-pill--match-event .cb-pill__dot { background: #ef4444; }
+      .ce-strip--field-call { background: #f59e0b; color: #111111; }
 
       /* ── Player stats banner ── */
       #overlayBanner {
@@ -330,7 +275,7 @@
         align-self: stretch;
         width: 52px;
         flex-shrink: 0;
-        padding: 1.3px;
+        padding: 1px 1px 1px 2.3px;
       }
 
       .cb-banner-logo-circle {
@@ -598,7 +543,7 @@
 
       .roster-banner-item {
         display: flex;
-        justify-content: center;
+        justify-content: flex-start;
         font-size: 13px;
         font-weight: 600;
         letter-spacing: 0.04em;
@@ -610,7 +555,7 @@
         display: inline-flex;
         flex-wrap: wrap;
         align-items: center;
-        justify-content: center;
+        justify-content: flex-start;
         gap: 4px;
         min-width: 0;
       }
@@ -645,73 +590,69 @@
   <body class="overlay-fixed">
     <div id="viewport">
       <div id="canvas">
-        <div class="cb-wrap">
-          <div class="cb-root">
-            <div class="cb-header">
-              <span class="cb-period" id="statusLabel" data-role="status-label">LIVE</span>
-              <span class="cb-clock" id="matchClock">--:--</span>
-              <div class="cb-header-strip cb-header-strip--field-call" id="fieldCallBanner">
-                <span class="cb-header-strip__label" id="fieldCallBannerLabel">Field Call</span>
+        <div class="ce-wrap">
+          <div class="ce-tab ce-tab--top" id="eventName">Event</div>
+
+          <div class="ce-main">
+            <div class="ce-logo">
+              <img id="eventLogo" alt="" />
+              <span class="ce-logo-fallback" id="eventLogoFallback">SC</span>
+            </div>
+
+            <div class="ce-teams">
+              <div class="ce-team" id="teamABox">
+                <span class="ce-swatch"></span>
+                <span class="ce-team-name" id="teamAName">Team A</span>
               </div>
-              <div class="cb-header-strip cb-header-strip--match-event" id="matchEventBanner">
-                <span class="cb-header-strip__label" id="matchEventBannerLabel">Stoppage</span>
+              <div class="ce-team" id="teamBBox">
+                <span class="ce-swatch"></span>
+                <span class="ce-team-name" id="teamBName">Team B</span>
               </div>
             </div>
 
-            <div class="cb-teams" id="teamABox">
-              <div class="cb-logo-cell">
-                <div class="cb-logo-circle" id="teamALogoCell">
-                  <img id="teamALogo" alt="" />
-                  <span class="cb-logo-fallback" id="teamALogoFallback">A</span>
-                </div>
-              </div>
-              <div class="cb-name-cell">
-                <span id="teamAName">Team A</span>
-              </div>
-              <div class="cb-score-cell">
-                <span id="scoreA">0</span>
-              </div>
-              <!-- Timeout strip for Team A — visible when Team A calls timeout -->
-              <div class="cb-timeout-strip" id="timeoutBannerA">
-                <span class="cb-timeout-strip__label">Timeout</span>
-              </div>
-              <!-- Break chance strip for Team A -->
-              <div class="cb-break-strip" id="breakChanceBannerA">
-                <span class="cb-break-strip__label">Break Chance</span>
-              </div>
+            <div class="ce-scores">
+              <span id="scoreA">0</span>
+              <span id="scoreB">0</span>
             </div>
 
-            <div class="cb-teams" id="teamBBox">
-              <div class="cb-logo-cell">
-                <div class="cb-logo-circle" id="teamBLogoCell">
-                  <img id="teamBLogo" alt="" />
-                  <span class="cb-logo-fallback" id="teamBLogoFallback">B</span>
-                </div>
+            <div class="ce-strips">
+              <div class="ce-strip ce-strip--timeout" id="timeoutBannerA">
+                <span class="ce-strip__label ce-strip__label--stacked">
+                  <span>Timeout</span>
+                  <span class="ce-strip__sub">(<span id="timeoutTeamShortA">Team A</span>)</span>
+                </span>
               </div>
-              <div class="cb-name-cell">
-                <span id="teamBName">Team B</span>
+              <div class="ce-strip ce-strip--timeout" id="timeoutBannerB">
+                <span class="ce-strip__label ce-strip__label--stacked">
+                  <span>Timeout</span>
+                  <span class="ce-strip__sub">(<span id="timeoutTeamShortB">Team B</span>)</span>
+                </span>
               </div>
-              <div class="cb-score-cell">
-                <span id="scoreB">0</span>
+              <div class="ce-strip ce-strip--break" id="breakChanceBannerA">
+                <span class="ce-strip__label">Break Chance</span>
               </div>
-              <!-- Timeout strip for Team B — visible when Team B calls timeout -->
-              <div class="cb-timeout-strip" id="timeoutBannerB">
-                <span class="cb-timeout-strip__label">Timeout</span>
+              <div class="ce-strip ce-strip--break" id="breakChanceBannerB">
+                <span class="ce-strip__label">Break Chance</span>
               </div>
-              <!-- Break chance strip for Team B -->
-              <div class="cb-break-strip" id="breakChanceBannerB">
-                <span class="cb-break-strip__label">Break Chance</span>
+              <div class="ce-strip ce-strip--match-event" id="matchEventBanner">
+                <span class="ce-strip__label" id="matchEventBannerLabel">Stoppage</span>
+              </div>
+              <div class="ce-strip ce-strip--field-call" id="fieldCallBanner">
+                <span class="ce-strip__label" id="fieldCallBannerLabel">Field Call</span>
               </div>
             </div>
           </div>
 
+          <!-- Organiser text: edit here -->
+          <div class="ce-tab ce-tab--bottom">Cape Town Flying Disc Association</div>
         </div>
 
-        <!-- Required stubs -->
-        <div id="overlayBar" style="display:none"></div>
-        <div id="eventLogo" style="display:none"></div>
-        <div id="eventLogoFallback" style="display:none"></div>
-        <div id="eventName" style="display:none"></div>
+        <!-- Required stubs (status/clock are not shown in this layout) -->
+        <div style="display:none">
+          <div id="overlayBar"></div>
+          <span id="statusLabel" data-role="status-label">LIVE</span>
+          <span id="matchClock">--:--</span>
+        </div>
 
         <!-- Player stats banner -->
         <div id="overlayBanner">
@@ -792,6 +733,37 @@
           </div>
         </div>
 
+        <!-- Match info banner -->
+        <div class="overlay-matchstatus-banner" id="matchStatusBanner" aria-live="polite">
+          <div class="matchstats-card matchstatus-card">
+            <div class="matchstatus-event">
+              <img class="matchstatus-logo" id="matchStatusLogo" alt="" />
+              <span id="matchStatusEvent">Event</span>
+            </div>
+            <div class="matchstatus-header">
+              <div class="matchstatus-title">
+                <span class="matchstatus-team" id="matchStatusTeamA">Team A</span>
+                <span class="matchstatus-score" id="matchStatusScore">vs</span>
+                <span class="matchstatus-team" id="matchStatusTeamB">Team B</span>
+              </div>
+              <span class="matchstatus-chip" id="matchStatusPhase">Upcoming</span>
+            </div>
+            <div class="matchstatus-meta">
+              <div class="matchstatus-meta-row" id="matchStatusKickoffRow">
+                <span class="matchstatus-meta-label">Start</span>
+                <span class="matchstatus-meta-value" id="matchStatusKickoff">--</span>
+              </div>
+              <div class="matchstatus-meta-row matchstatus-venue-row">
+                <span class="matchstatus-meta-label">Venue -</span>
+                <span class="matchstatus-meta-value" id="matchStatusVenue">--</span>
+              </div>
+              <div class="matchstatus-meta-row matchstatus-weather-row" id="matchStatusWeatherRow">
+                <span class="matchstatus-meta-value" id="matchStatusWeather">--</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="meta" id="meta"></div>
       </div>
     </div>
@@ -808,78 +780,45 @@
       window.addEventListener('resize', scaleCanvas);
       scaleCanvas();
 
-      // Mirror --team-bg from teamABox/teamBBox onto .cb-pills as --team-bg-a/b
+      // One break-chance banner for both teams: open #breakChanceBannerA while either side is active
       (function () {
-        function syncPillColors() {
-          var pills = document.querySelector('.cb-pills');
-          if (!pills) return;
-          var a = document.getElementById('teamABox');
-          var b = document.getElementById('teamBBox');
-          if (a) pills.style.setProperty('--team-bg-a', a.style.getPropertyValue('--team-bg') || '#888');
-          if (b) pills.style.setProperty('--team-bg-b', b.style.getPropertyValue('--team-bg') || '#888');
+        function isOn(el) {
+          return el.classList.contains('is-active') || el.classList.contains('is-persistent');
         }
-        var obs = new MutationObserver(syncPillColors);
         document.addEventListener('DOMContentLoaded', function () {
-          var a = document.getElementById('teamABox');
-          var b = document.getElementById('teamBBox');
-          if (a) obs.observe(a, { attributes: true, attributeFilter: ['style'] });
-          if (b) obs.observe(b, { attributes: true, attributeFilter: ['style'] });
+          var a = document.getElementById('breakChanceBannerA');
+          var b = document.getElementById('breakChanceBannerB');
+          if (!a || !b) return;
+          function sync() { a.classList.toggle('is-shared-active', isOn(a) || isOn(b)); }
+          var obs = new MutationObserver(sync);
+          obs.observe(a, { attributes: true, attributeFilter: ['class'] });
+          obs.observe(b, { attributes: true, attributeFilter: ['class'] });
+          sync();
         });
       })();
 
-      // Keep logo fallback text in sync with team name initials
+      // Mirror --team-bg/--team-text from each team row onto its timeout strip
       (function () {
-        function getInitials(text) {
-          var words = (text || '').trim().split(/\s+/);
-          if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
-          return words.slice(0, 2).map(function (w) { return w[0]; }).join('').toUpperCase();
-        }
-        function syncFallback(nameId, fallbackId) {
-          var nameEl = document.getElementById(nameId);
-          var fallbackEl = document.getElementById(fallbackId);
-          if (!nameEl || !fallbackEl) return;
-          new MutationObserver(function () {
-            fallbackEl.textContent = getInitials(nameEl.textContent);
-          }).observe(nameEl, { childList: true, characterData: true, subtree: true });
-        }
-        document.addEventListener('DOMContentLoaded', function () {
-          syncFallback('teamAName', 'teamALogoFallback');
-          syncFallback('teamBName', 'teamBLogoFallback');
-        });
-      })();
-
-      (function () {
-        // Both team logos must be present for the logo section to display.
-        // If either is missing, hide both logo cells entirely.
-        function readLogo(key) {
-          try { return localStorage.getItem(key) || ''; } catch (e) { return ''; }
-        }
-        function setSectionHidden(hidden) {
-          ['teamALogoCell', 'teamBLogoCell'].forEach(function (cellId) {
-            var cell = document.getElementById(cellId);
-            if (!cell) return;
-            var wrap = cell.closest('.cb-logo-cell') || cell;
-            wrap.style.display = hidden ? 'none' : '';
+        var pairs = [['teamABox', 'timeoutBannerA'], ['teamBBox', 'timeoutBannerB']];
+        function sync(boxId, stripId) {
+          var box = document.getElementById(boxId);
+          var strip = document.getElementById(stripId);
+          if (!box || !strip) return;
+          ['--team-bg', '--team-text'].forEach(function (prop) {
+            var value = box.style.getPropertyValue(prop);
+            if (value) strip.style.setProperty(prop, value);
+            else strip.style.removeProperty(prop);
           });
         }
-        function loadLogo(imgId, cellId, src) {
-          var img = document.getElementById(imgId);
-          var cell = document.getElementById(cellId);
-          if (!img || !cell) return;
-          img.src = src;
-          img.onload = function () { cell.classList.add('has-image'); };
-          img.onerror = function () { cell.classList.remove('has-image'); };
-        }
-
-        var srcA = readLogo('stallcount:logo-team-a');
-        var srcB = readLogo('stallcount:logo-team-b');
-        if (srcA && srcB) {
-          setSectionHidden(false);
-          loadLogo('teamALogo', 'teamALogoCell', srcA);
-          loadLogo('teamBLogo', 'teamBLogoCell', srcB);
-        } else {
-          setSectionHidden(true);
-        }
+        document.addEventListener('DOMContentLoaded', function () {
+          pairs.forEach(function (pair) {
+            var box = document.getElementById(pair[0]);
+            if (!box) return;
+            new MutationObserver(function () { sync(pair[0], pair[1]); })
+              .observe(box, { attributes: true, attributeFilter: ['style'] });
+            sync(pair[0], pair[1]);
+          });
+        });
       })();
 
       // Sync banner logo with whichever team the player stats banner belongs to

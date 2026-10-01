@@ -112,6 +112,10 @@ function formatKickoffCat(value) {
   return `${date}, ${hh}:${mm} CAT`;
 }
 
+function isRulesLeaf(value) {
+  return value === null || value === undefined || typeof value !== "object";
+}
+
 function renderRulesValue(value, keyPrefix = "", depth = 0) {
   if (depth > 10) return <span className="rules-empty">…</span>;
 
@@ -138,12 +142,18 @@ function renderRulesValue(value, keyPrefix = "", depth = 0) {
     if (!entries.length) return <span className="rules-empty">No details</span>;
     return (
       <ul className="rules-list">
-        {entries.map(([key, itemValue]) => (
-          <li className="rules-item" key={`${keyPrefix}-${key}`}>
-            <span className="rules-key">{key}</span>
-            <div className="rules-value">{renderRulesValue(itemValue, `${keyPrefix}-${key}`, depth + 1)}</div>
-          </li>
-        ))}
+        {entries.map(([key, itemValue]) => {
+          const leaf = isRulesLeaf(itemValue);
+          return (
+            <li
+              className={`rules-item${leaf ? " rules-item--leaf" : ""}`}
+              key={`${keyPrefix}-${key}`}
+            >
+              <span className="rules-key">{key}</span>
+              <div className="rules-value">{renderRulesValue(itemValue, `${keyPrefix}-${key}`, depth + 1)}</div>
+            </li>
+          );
+        })}
       </ul>
     );
   }
@@ -167,6 +177,7 @@ const noop = () => {};
 
 export function ControlView({
   overlayUrl,
+  overlayPreviewUrl,
   canPreview,
   copied,
   handleCopy,
@@ -273,12 +284,12 @@ export function ControlView({
           </button>
           <a
             className={`sc-button ${canPreview ? "" : "is-disabled"}`}
-            href={canPreview ? overlayUrl : undefined}
+            href={canPreview ? overlayPreviewUrl : undefined}
             target="_blank"
             rel="noreferrer"
             aria-disabled={!canPreview}
           >
-            Open overlay
+            Open preview
           </a>
         </div>
       </header>
@@ -341,9 +352,11 @@ export function ControlView({
                         {statusWeather ? (
                           <>
                             {statusWeather.icon}{" "}
-                            {statusWeather.temp != null
-                              ? `${statusWeather.temp}${statusWeather.tempUnit}`
-                              : ""}{" "}
+                            {statusWeather.feelsLike != null
+                              ? `${statusWeather.feelsLike}${statusWeather.tempUnit} feels like`
+                              : statusWeather.temp != null
+                                ? `${statusWeather.temp}${statusWeather.tempUnit}`
+                                : ""}{" "}
                             {statusWeather.condition}
                             {statusWeather.wind != null
                               ? ` · ${statusWeather.wind} ${statusWeather.windUnit} wind`.trimEnd()

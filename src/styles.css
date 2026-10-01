@@ -385,7 +385,44 @@
 
 .config-form-col {
   display: grid;
+  gap: 1.5rem;
+}
+
+.config-fieldgroup {
+  display: grid;
   gap: 1.2rem;
+  padding: 1.25rem;
+  border: 1px solid var(--sc-card-muted-border);
+  border-radius: 14px;
+  background: var(--sc-card-muted-bg);
+}
+
+.config-fieldgroup__title {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sc-ink-muted);
+}
+
+.config-field-or {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.15rem 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sc-ink-muted);
+}
+
+.config-field-or::before,
+.config-field-or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--sc-border);
 }
 
 .config-preview-col {
@@ -1476,6 +1513,27 @@
 .rules-item {
   display: grid;
   gap: 0.15rem;
+}
+
+/* Leaf values render inline as "KEY: value" when there is horizontal room,
+   wrapping back to the stacked (key over value) layout when space is tight. */
+.rules-item--leaf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.4rem;
+  row-gap: 0.15rem;
+}
+
+.rules-item--leaf .rules-key::after {
+  content: ":";
+}
+
+.rules-item--leaf .rules-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-left: 0;
+  border-left: none;
 }
 
 .rules-key {

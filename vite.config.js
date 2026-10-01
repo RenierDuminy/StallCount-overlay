@@ -16,6 +16,7 @@ export default defineConfig({
         overlayDebug: fileURLToPath(new URL("./overlay-debug.html", import.meta.url)),
         overlayWfdfCompetitive: fileURLToPath(new URL("./overlays/wfdf-competitive.html", import.meta.url)),
         overlayCornerBox: fileURLToPath(new URL("./overlays/corner-box.html", import.meta.url)),
+        overlayCtfda: fileURLToPath(new URL("./overlays/ctfda.html", import.meta.url)),
         overlayCornerBoxBottomLeft: fileURLToPath(new URL("./overlays/corner-box-bottom-left.html", import.meta.url)),
         overlayCompactBar: fileURLToPath(new URL("./overlays/compact-bar.html", import.meta.url)),
         overlayWideBar: fileURLToPath(new URL("./overlays/wide-bar.html", import.meta.url)),

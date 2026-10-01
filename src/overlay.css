@@ -482,8 +482,9 @@ body.overlay-fixed .overlay-event {
 }
 
 .matchstatus-event {
+  position: relative;
   text-align: center;
-  padding: 0.6rem 1rem;
+  padding: 1.2rem 1rem;
   font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: 0.16em;
@@ -500,6 +501,20 @@ body.overlay-fixed .overlay-event {
   gap: 0.45rem;
   padding: 0.4rem 1.4rem 0.5rem;
   text-align: center;
+}
+
+.matchstatus-logo {
+  position: absolute;
+  top: 50%;
+  left: 1rem;
+  transform: translateY(-50%);
+  width: 3.2rem;
+  height: 3.2rem;
+  object-fit: contain;
+}
+
+.matchstatus-logo.is-hidden {
+  display: none;
 }
 
 .matchstatus-title {
@@ -598,6 +613,13 @@ body.overlay-fixed .overlay-event {
 
 .matchstatus-meta-row.is-hidden {
   display: none;
+}
+
+#matchStatusKickoffRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  flex-wrap: nowrap;
 }
 
 .matchstatus-venue-row,

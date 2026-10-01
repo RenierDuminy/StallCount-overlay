@@ -536,8 +536,8 @@
       }
     </style>
     <script>
-      document.head.insertAdjacentHTML('beforeend', '<style>' +
-        '#canvas{outline:1px solid rgba(255,255,255,0.4);background-image:repeating-linear-gradient(45deg,rgba(255,255,255,0.03) 0px,rgba(255,255,255,0.03) 1px,transparent 1px,transparent 12px),repeating-linear-gradient(-45deg,rgba(255,255,255,0.03) 0px,rgba(255,255,255,0.03) 1px,transparent 1px,transparent 12px)}' +
+      if (new URLSearchParams(window.location.search).has('preview')) document.head.insertAdjacentHTML('beforeend', '<style>' +
+        '#canvas{outline:1px solid rgba(255,255,255,0.4);background-image:repeating-linear-gradient(45deg,rgba(255,255,255,0.03) 0px,rgba(255,255,255,0.03) 1px,transparent 1px,transparent 12px),repeating-linear-gradient(-45deg,rgba(255,255,255,0.03) 0px,rgba(255,255,255,0.03) 1px,transparent 1px,transparent 12px),url(/overlay-demo.jpg);background-size:auto,auto,cover;background-position:0 0,0 0,center}' +
       '</style>');
     </script>
   </head>
@@ -683,20 +683,36 @@
       scaleCanvas();
 
       (function () {
-        function applyTeamLogo(imgId, cellId, key) {
-          try {
-            var src = localStorage.getItem(key);
-            if (!src) return;
-            var img = document.getElementById(imgId);
-            var cell = document.getElementById(cellId);
-            if (!img || !cell) return;
-            img.src = src;
-            img.onload = function () { cell.classList.add('has-image'); };
-            img.onerror = function () { cell.classList.remove('has-image'); };
-          } catch (e) {}
+        // Both team logos must be present for the logo section to display.
+        // If either is missing, hide both logo cells entirely.
+        function readLogo(key) {
+          try { return localStorage.getItem(key) || ''; } catch (e) { return ''; }
         }
-        applyTeamLogo('teamALogo', 'teamABadgeCell', 'stallcount:logo-team-a');
-        applyTeamLogo('teamBLogo', 'teamBBadgeCell', 'stallcount:logo-team-b');
+        function setSectionHidden(cellIds, hidden) {
+          cellIds.forEach(function (cellId) {
+            var cell = document.getElementById(cellId);
+            if (cell) cell.style.display = hidden ? 'none' : '';
+          });
+        }
+        function loadLogo(imgId, cellId, src) {
+          var img = document.getElementById(imgId);
+          var cell = document.getElementById(cellId);
+          if (!img || !cell) return;
+          img.src = src;
+          img.onload = function () { cell.classList.add('has-image'); };
+          img.onerror = function () { cell.classList.remove('has-image'); };
+        }
+
+        var cells = ['teamABadgeCell', 'teamBBadgeCell'];
+        var srcA = readLogo('stallcount:logo-team-a');
+        var srcB = readLogo('stallcount:logo-team-b');
+        if (srcA && srcB) {
+          setSectionHidden(cells, false);
+          loadLogo('teamALogo', 'teamABadgeCell', srcA);
+          loadLogo('teamBLogo', 'teamBBadgeCell', srcB);
+        } else {
+          setSectionHidden(cells, true);
+        }
       })();
     </script>
     <script type="module" src="../src/overlays/wfdf-competitive.js"></script>

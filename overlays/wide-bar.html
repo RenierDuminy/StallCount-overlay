@@ -524,8 +524,8 @@
       }
     </style>
     <script>
-      document.head.insertAdjacentHTML('beforeend', '<style>' +
-        '#canvas{outline:1px solid rgba(255,255,255,0.4);background-image:repeating-linear-gradient(45deg,rgba(255,255,255,0.03) 0px,rgba(255,255,255,0.03) 1px,transparent 1px,transparent 12px),repeating-linear-gradient(-45deg,rgba(255,255,255,0.03) 0px,rgba(255,255,255,0.03) 1px,transparent 1px,transparent 12px)}' +
+      if (new URLSearchParams(window.location.search).has('preview')) document.head.insertAdjacentHTML('beforeend', '<style>' +
+        '#canvas{outline:1px solid rgba(255,255,255,0.4);background-image:repeating-linear-gradient(45deg,rgba(255,255,255,0.03) 0px,rgba(255,255,255,0.03) 1px,transparent 1px,transparent 12px),repeating-linear-gradient(-45deg,rgba(255,255,255,0.03) 0px,rgba(255,255,255,0.03) 1px,transparent 1px,transparent 12px),url(/overlay-demo.jpg);background-size:auto,auto,cover;background-position:0 0,0 0,center}' +
       '</style>');
     </script>
   </head>
@@ -669,19 +669,34 @@
       scaleCanvas();
 
       (function () {
-        function applyTeamLogo(imgId, key) {
-          try {
-            var src = localStorage.getItem(key);
-            if (!src) return;
-            var img = document.getElementById(imgId);
-            if (!img || !img.parentElement) return;
-            img.src = src;
-            img.onload = function () { img.parentElement.classList.add('has-image'); };
-            img.onerror = function () { img.parentElement.classList.remove('has-image'); };
-          } catch (e) {}
+        // Both team logos must be present for the logo section to display.
+        // If either is missing, hide both logo cells entirely.
+        function readLogo(key) {
+          try { return localStorage.getItem(key) || ''; } catch (e) { return ''; }
         }
-        applyTeamLogo('teamALogo', 'stallcount:logo-team-a');
-        applyTeamLogo('teamBLogo', 'stallcount:logo-team-b');
+        function setSectionHidden(hidden) {
+          ['teamALogo', 'teamBLogo'].forEach(function (imgId) {
+            var img = document.getElementById(imgId);
+            if (img && img.parentElement) img.parentElement.style.display = hidden ? 'none' : '';
+          });
+        }
+        function loadLogo(imgId, src) {
+          var img = document.getElementById(imgId);
+          if (!img || !img.parentElement) return;
+          img.src = src;
+          img.onload = function () { img.parentElement.classList.add('has-image'); };
+          img.onerror = function () { img.parentElement.classList.remove('has-image'); };
+        }
+
+        var srcA = readLogo('stallcount:logo-team-a');
+        var srcB = readLogo('stallcount:logo-team-b');
+        if (srcA && srcB) {
+          setSectionHidden(false);
+          loadLogo('teamALogo', srcA);
+          loadLogo('teamBLogo', srcB);
+        } else {
+          setSectionHidden(true);
+        }
       })();
     </script>
     <script type="module" src="../src/overlays/wfdf-competitive.js"></script>

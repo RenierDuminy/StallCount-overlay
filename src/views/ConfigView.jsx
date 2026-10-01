@@ -5,6 +5,7 @@ const OVERLAY_OPTIONS = [
   { value: "overlays/compact-bar.html", label: "Compact bar", hasTeamLogos: true },
   { value: "overlays/corner-box-bottom-left.html", label: "Corner box (Bottom-L)", hasTeamLogos: true },
   { value: "overlays/corner-box.html", label: "Corner box (Top-L)", hasTeamLogos: true },
+  { value: "overlays/ctfda.html", label: "CTFDA overlay", hasEventLogo: true },
   { value: "overlays/top-right-list.html", label: "Top-right list" },
   { value: "overlays/wfdf-competitive.html", label: "WFDF competitive", hasEventLogo: true },
   { value: "overlays/wide-bar.html", label: "Wide bar", hasTeamLogos: true },
@@ -12,13 +13,40 @@ const OVERLAY_OPTIONS = [
 ];
 
 
-function readFileAsDataUrl(file) {
+const LOGO_MAX_DIMENSION = 512;
+
+function readRawDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => resolve(e.target.result);
     reader.onerror = () => reject(new Error("Failed to read file"));
     reader.readAsDataURL(file);
   });
+}
+
+// Logos are stored in localStorage (~5 MB per origin, shared by all logos),
+// so downscale large images to keep the data URL small enough to save.
+async function readFileAsDataUrl(file) {
+  const raw = await readRawDataUrl(file);
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("Failed to decode image"));
+      img.src = raw;
+    });
+    const { naturalWidth: width, naturalHeight: height } = image;
+    if (!width || !height) return raw;
+    const scale = Math.min(1, LOGO_MAX_DIMENSION / Math.max(width, height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(width * scale);
+    canvas.height = Math.round(height * scale);
+    canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+    const resized = canvas.toDataURL("image/png");
+    return resized.length < raw.length ? resized : raw;
+  } catch {
+    return raw;
+  }
 }
 
 function formatDateTime(value) {
@@ -31,8 +59,11 @@ function formatDateTime(value) {
 function formatMatchOptionLabel(match) {
   const teamAName = match.team_a?.name || "Team A";
   const teamBName = match.team_b?.name || "Team B";
-  const when = formatDateTime(match.start_time);
-  return `${teamAName} vs ${teamBName} — ${when}`;
+  const parsed = match.start_time ? new Date(match.start_time) : null;
+  const hasTime = parsed && !Number.isNaN(parsed.getTime());
+  const date = hasTime ? parsed.toLocaleDateString() : "--";
+  const time = hasTime ? parsed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--";
+  return `${date} - ${time} - ${teamAName} vs ${teamBName}`;
 }
 
 export function ConfigView({
@@ -114,6 +145,9 @@ export function ConfigView({
 
           {/* Left column: form */}
           <div className="config-form-col">
+            <div className="config-fieldgroup">
+              <h2 className="config-fieldgroup__title">Match selection</h2>
+
             <Field label="Overlay">
               <Select
                 value={overlayChoice}
@@ -151,7 +185,7 @@ export function ConfigView({
               ) : null}
             </Field>
 
-            <Field label="Match">
+            <Field label="Match" action={hasMatchId ? "✓" : null}>
               <Select
                 value={matchId}
                 onChange={(event) => setMatchId(event.target.value)}
@@ -175,9 +209,8 @@ export function ConfigView({
               {eventMatchesError ? (
                 <p className="overlay-data-state overlay-data-state--error">{eventMatchesError}</p>
               ) : null}
-            </Field>
 
-            <Field label="Match ID (manual override / testing)" action={hasMatchId ? "✓" : null}>
+              <div className="config-field-or">or paste a match ID</div>
               <Input
                 value={matchId}
                 onChange={(event) => setMatchId(event.target.value)}
@@ -204,6 +237,39 @@ export function ConfigView({
                 ) : (
                   <p className="overlay-option-note">No match found.</p>
                 )
+              ) : null}
+            </Field>
+            </div>
+
+            <div className="config-fieldgroup">
+              <h2 className="config-fieldgroup__title">Branding &amp; appearance</h2>
+
+            <Field label="Tournament logo">
+              <Input
+                type="file"
+                accept="image/*"
+                disabled={configLocked}
+                onChange={async (event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  const dataUrl = await readFileAsDataUrl(file);
+                  setEventLogo(dataUrl);
+                }}
+              />
+              {eventLogo ? (
+                <div className="overlay-logo-preview">
+                  <img src={eventLogo} alt="Tournament logo" />
+                  <button type="button" className="sc-button is-ghost" disabled={configLocked} onClick={() => setEventLogo("")}>
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <p className="overlay-option-note">Using default StallCount logo</p>
+              )}
+              {!showEventLogo ? (
+                <p className="overlay-option-note">
+                  The current overlay style doesn’t display a tournament logo, but it’s saved and will be used if you switch to a style that does.
+                </p>
               ) : null}
             </Field>
 
@@ -256,32 +322,6 @@ export function ConfigView({
                 </div>
               </div>
             </Field>
-
-            {showEventLogo ? (
-              <Field label="Event logo">
-                <Input
-                  type="file"
-                  accept="image/*"
-                  disabled={configLocked}
-                  onChange={async (event) => {
-                    const file = event.target.files?.[0];
-                    if (!file) return;
-                    const dataUrl = await readFileAsDataUrl(file);
-                    setEventLogo(dataUrl);
-                  }}
-                />
-                {eventLogo ? (
-                  <div className="overlay-logo-preview">
-                    <img src={eventLogo} alt="Event logo" />
-                    <button type="button" className="sc-button is-ghost" disabled={configLocked} onClick={() => setEventLogo("")}>
-                      Remove
-                    </button>
-                  </div>
-                ) : (
-                  <p className="overlay-option-note">Using default StallCount logo</p>
-                )}
-              </Field>
-            ) : null}
 
             {showTeamLogos ? (
               <Field label="Team logos">
@@ -337,6 +377,7 @@ export function ConfigView({
                 </div>
               </Field>
             ) : null}
+            </div>
           </div>
 
           {/* Right column: preview */}

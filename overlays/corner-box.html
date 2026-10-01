@@ -160,6 +160,7 @@
       .cb-name-cell {
         display: flex;
         align-items: center;
+        justify-content: flex-start;
         padding: 0 10px;
         font-size: 20px;
         font-weight: 700;
@@ -172,12 +173,12 @@
       .cb-score-cell {
         display: flex;
         align-items: center;
-        justify-content: center;
+        justify-content: flex-end;
         font-family: "Bebas Neue", sans-serif;
         font-size: 44px;
         letter-spacing: 0.04em;
         color: var(--team-text, #ffffff);
-        padding: 6px 10px;
+        padding: 6px 10px 6px 0;
       }
 
       /* ── Timeout strip — attached to the right edge of the calling team's row ── */
@@ -638,8 +639,8 @@
       }
     </style>
     <script>
-      document.head.insertAdjacentHTML('beforeend', '<style>' +
-        '#canvas{outline:1px solid rgba(255,255,255,0.4);background-image:repeating-linear-gradient(45deg,rgba(255,255,255,0.03) 0px,rgba(255,255,255,0.03) 1px,transparent 1px,transparent 12px),repeating-linear-gradient(-45deg,rgba(255,255,255,0.03) 0px,rgba(255,255,255,0.03) 1px,transparent 1px,transparent 12px)}' +
+      if (new URLSearchParams(window.location.search).has('preview')) document.head.insertAdjacentHTML('beforeend', '<style>' +
+        '#canvas{outline:1px solid rgba(255,255,255,0.4);background-image:repeating-linear-gradient(45deg,rgba(255,255,255,0.03) 0px,rgba(255,255,255,0.03) 1px,transparent 1px,transparent 12px),repeating-linear-gradient(-45deg,rgba(255,255,255,0.03) 0px,rgba(255,255,255,0.03) 1px,transparent 1px,transparent 12px),url(/overlay-demo.jpg);background-size:auto,auto,cover;background-position:0 0,0 0,center}' +
       '</style>');
     </script>
   </head>
@@ -796,7 +797,10 @@
         <!-- Match info banner -->
         <div class="overlay-matchstatus-banner" id="matchStatusBanner" aria-live="polite">
           <div class="matchstats-card matchstatus-card">
-            <div class="matchstatus-event" id="matchStatusEvent">Event</div>
+            <div class="matchstatus-event">
+              <img class="matchstatus-logo" id="matchStatusLogo" alt="" />
+              <span id="matchStatusEvent">Event</span>
+            </div>
             <div class="matchstatus-header">
               <div class="matchstatus-title">
                 <span class="matchstatus-team" id="matchStatusTeamA">Team A</span>
@@ -878,20 +882,37 @@
       })();
 
       (function () {
-        function applyTeamLogo(imgId, cellId, key) {
-          try {
-            var src = localStorage.getItem(key);
-            if (!src) return;
-            var img = document.getElementById(imgId);
-            var cell = document.getElementById(cellId);
-            if (!img || !cell) return;
-            img.src = src;
-            img.onload = function () { cell.classList.add('has-image'); };
-            img.onerror = function () { cell.classList.remove('has-image'); };
-          } catch (e) {}
+        // Both team logos must be present for the logo section to display.
+        // If either is missing, hide both logo cells entirely.
+        function readLogo(key) {
+          try { return localStorage.getItem(key) || ''; } catch (e) { return ''; }
         }
-        applyTeamLogo('teamALogo', 'teamALogoCell', 'stallcount:logo-team-a');
-        applyTeamLogo('teamBLogo', 'teamBLogoCell', 'stallcount:logo-team-b');
+        function setSectionHidden(hidden) {
+          ['teamALogoCell', 'teamBLogoCell'].forEach(function (cellId) {
+            var cell = document.getElementById(cellId);
+            if (!cell) return;
+            var wrap = cell.closest('.cb-logo-cell') || cell;
+            wrap.style.display = hidden ? 'none' : '';
+          });
+        }
+        function loadLogo(imgId, cellId, src) {
+          var img = document.getElementById(imgId);
+          var cell = document.getElementById(cellId);
+          if (!img || !cell) return;
+          img.src = src;
+          img.onload = function () { cell.classList.add('has-image'); };
+          img.onerror = function () { cell.classList.remove('has-image'); };
+        }
+
+        var srcA = readLogo('stallcount:logo-team-a');
+        var srcB = readLogo('stallcount:logo-team-b');
+        if (srcA && srcB) {
+          setSectionHidden(false);
+          loadLogo('teamALogo', 'teamALogoCell', srcA);
+          loadLogo('teamBLogo', 'teamBLogoCell', srcB);
+        } else {
+          setSectionHidden(true);
+        }
       })();
 
       // Sync banner logo with whichever team the player stats banner belongs to

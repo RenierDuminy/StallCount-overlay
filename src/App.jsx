@@ -137,6 +137,8 @@ function readLogoDataUrl(key) {
   }
 }
 
+// Returns false when the logo could not be stored (usually the storage quota),
+// in which case overlays would never see it.
 function saveLogoDataUrl(key, dataUrl) {
   try {
     if (dataUrl) {
@@ -144,8 +146,11 @@ function saveLogoDataUrl(key, dataUrl) {
     } else {
       window.localStorage.removeItem(key);
     }
-  } catch {
-    // Ignore — data URL may exceed storage quota on some browsers.
+    return true;
+  } catch (error) {
+    console.warn(`Failed to save logo "${key}"`, error);
+    window.alert("This logo couldn't be saved for the overlay (the image is too large). Try a smaller image.");
+    return false;
   }
 }
 
@@ -309,16 +314,13 @@ export default function App() {
   const [eventMatchesError, setEventMatchesError] = useState("");
 
   const setTeamALogo = (dataUrl) => {
-    saveLogoDataUrl(LOGO_STORAGE_KEY_A, dataUrl);
-    setTeamALogoState(dataUrl);
+    if (saveLogoDataUrl(LOGO_STORAGE_KEY_A, dataUrl)) setTeamALogoState(dataUrl);
   };
   const setTeamBLogo = (dataUrl) => {
-    saveLogoDataUrl(LOGO_STORAGE_KEY_B, dataUrl);
-    setTeamBLogoState(dataUrl);
+    if (saveLogoDataUrl(LOGO_STORAGE_KEY_B, dataUrl)) setTeamBLogoState(dataUrl);
   };
   const setEventLogo = (dataUrl) => {
-    saveLogoDataUrl(LOGO_STORAGE_KEY_EVENT, dataUrl);
-    setEventLogoState(dataUrl);
+    if (saveLogoDataUrl(LOGO_STORAGE_KEY_EVENT, dataUrl)) setEventLogoState(dataUrl);
   };
 
   const trimmedMatchId = matchId.trim();
@@ -1391,6 +1393,7 @@ export default function App() {
         {isControlView ? (
           <ControlView
             overlayUrl={overlayUrl}
+            overlayPreviewUrl={overlayPreviewUrl}
             canPreview={canPreview}
             copied={copied}
             handleCopy={handleCopy}
