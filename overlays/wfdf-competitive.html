@@ -19,16 +19,14 @@
       #viewport {
         position: absolute;
         inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        overflow: hidden;
       }
 
       #canvas {
         position: relative;
         width: 1920px;
         height: 1080px;
-        transform-origin: center;
+        transform-origin: top left;
       }
 
       #canvas .overlay-root {
@@ -49,7 +47,7 @@
         <div class="overlay-root">
           <div class="overlay-bar" id="overlayBar">
             <div class="overlay-logo">
-              <img id="eventLogo" alt="League logo" src="../stallcount-logo.png" />
+              <img id="eventLogo" alt="League logo" src="/stallcount-logo.png" />
               <span class="overlay-logo-fallback" id="eventLogoFallback">SC</span>
             </div>
 

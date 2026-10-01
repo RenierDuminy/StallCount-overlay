@@ -31,7 +31,9 @@ VITE_SUPABASE_ANON_KEY=...
 Overlay URLs
 ------------
 - Control page: https://overlay.yourdomain.com/
-- Overlay output: https://overlay.yourdomain.com/overlay-wfdf-competitive.html?matchId=<match-id>
+- Overlay output: https://overlay.yourdomain.com/overlays/wfdf-competitive.html?matchId=<match-id>
+- Other overlays (same `?matchId=` param), all under `/overlays/`: badge-centre, compact-bar, corner-box, corner-box-bottom-left, ctfda, top-right-list, wide-bar
+- Debug overlay: /overlay-debug.html
 
 Optional query params on the control page:
 - ?matchId=<match-id> to prefill the match ID

@@ -7,6 +7,7 @@ import {
   onBannerTrigger,
   onMatchLogUpdate,
   onMetaMessage,
+  onEventLogo,
   manageBannerState,
   getOverlayPayloadKey,
   isAutoFadeEnabled,
@@ -671,11 +672,14 @@ function updateOverlay(payload) {
 
 const EVENT_LOGO_STORAGE_KEY = "stallcount:logo-event";
 let _scoreboardLogo = "";
+// Logo received over realtime from the control app; null until one arrives.
+let _receivedEventLogo = null;
 
 // An uploaded tournament logo overrides the scoreboard's logo.
 function resolveEventLogo() {
   let customEventLogo = "";
   try { customEventLogo = localStorage.getItem(EVENT_LOGO_STORAGE_KEY) || ""; } catch { /* storage unavailable */ }
+  if (_receivedEventLogo !== null) customEventLogo = _receivedEventLogo;
   return customEventLogo || _scoreboardLogo || DEFAULT_LOGO_SRC;
 }
 
@@ -1150,6 +1154,17 @@ onBannerTrigger((type, data) => {
 
 onMetaMessage(({ text, isError }) => setMeta(text, isError));
 
+// Keep the received logo in this browser's storage too, so a separate browser
+// (e.g. OBS) still has it after a reload when the control app isn't open.
+onEventLogo((dataUrl) => {
+  _receivedEventLogo = dataUrl;
+  try {
+    if (dataUrl) localStorage.setItem(EVENT_LOGO_STORAGE_KEY, dataUrl);
+    else localStorage.removeItem(EVENT_LOGO_STORAGE_KEY);
+  } catch { /* storage full or unavailable — the in-memory copy still applies */ }
+  applyEventLogo(resolveEventLogo());
+});
+
 // ─── Storage listener ─────────────────────────────────────────────────────────
 
 let _prevAutoFadeSettings = null;
@@ -1202,6 +1217,7 @@ window.addEventListener("storage", (event) => {
   }
 
   if (event.key === EVENT_LOGO_STORAGE_KEY) {
+    _receivedEventLogo = null; // same-browser upload: storage is now the source of truth
     applyEventLogo(resolveEventLogo());
     return;
   }

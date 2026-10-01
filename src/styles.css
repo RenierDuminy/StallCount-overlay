@@ -1369,6 +1369,23 @@
   background: transparent;
 }
 
+.preview-scaler {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.preview-frame--scaled {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1920px;
+  height: 1080px;
+  transform-origin: top left;
+}
+
 .preview-frame--overlay {
   z-index: 2;
   pointer-events: none;

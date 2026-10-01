@@ -319,8 +319,22 @@ export default function App() {
   const setTeamBLogo = (dataUrl) => {
     if (saveLogoDataUrl(LOGO_STORAGE_KEY_B, dataUrl)) setTeamBLogoState(dataUrl);
   };
+  // Latest event logo for the realtime channel handlers below.
+  const eventLogoRef = useMemo(() => ({ current: "" }), []);
+  eventLogoRef.current = eventLogo;
+
+  // Overlays in another browser (e.g. OBS) can't read this browser's storage,
+  // so the tournament logo is also pushed to them over realtime.
+  const broadcastEventLogo = (dataUrl) => {
+    overlayBannerChannelRef.current
+      ?.send({ type: "broadcast", event: "event-logo", payload: { dataUrl: dataUrl || "" } })
+      .catch(() => {});
+  };
+
   const setEventLogo = (dataUrl) => {
-    if (saveLogoDataUrl(LOGO_STORAGE_KEY_EVENT, dataUrl)) setEventLogoState(dataUrl);
+    if (!saveLogoDataUrl(LOGO_STORAGE_KEY_EVENT, dataUrl)) return;
+    setEventLogoState(dataUrl);
+    broadcastEventLogo(dataUrl);
   };
 
   const trimmedMatchId = matchId.trim();
@@ -689,7 +703,13 @@ export default function App() {
 
     const channel = supabase.channel(`overlay-banner:${trimmedMatchId}`);
     overlayBannerChannelRef.current = channel;
-    channel.subscribe();
+    channel
+      .on("broadcast", { event: "event-logo-request" }, () => {
+        if (eventLogoRef.current) broadcastEventLogo(eventLogoRef.current);
+      })
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED" && eventLogoRef.current) broadcastEventLogo(eventLogoRef.current);
+      });
 
     return () => {
       if (overlayBannerChannelRef.current === channel) {

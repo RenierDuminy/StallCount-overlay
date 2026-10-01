@@ -98,6 +98,7 @@ const _callbacks = {
   matchLogUpdate: [],
   clockTick: [],
   metaMessage: [],
+  eventLogo: [],
 };
 
 function _fire(event, ...args) {
@@ -112,6 +113,9 @@ export function onMatchUpdate(fn) { _callbacks.matchUpdate.push(fn); }
 export function onMatchLogUpdate(fn) { _callbacks.matchLogUpdate.push(fn); }
 export function onClockTick(fn) { _callbacks.clockTick.push(fn); }
 export function onMetaMessage(fn) { _callbacks.metaMessage.push(fn); }
+// Tournament logo sent by the control app over realtime ("" = removed).
+// Lets overlays in another browser (e.g. OBS) get the logo uploaded in the control app.
+export function onEventLogo(fn) { _callbacks.eventLogo.push(fn); }
 
 // ─── Public getters ───────────────────────────────────────────────────────────
 
@@ -692,7 +696,15 @@ function _setupSubscriptions() {
     .on("broadcast", { event: "overlay-banner" }, ({ payload }) => {
       _fire("bannerTrigger", payload?.type, payload);
     })
-    .subscribe();
+    .on("broadcast", { event: "event-logo" }, ({ payload }) => {
+      _fire("eventLogo", typeof payload?.dataUrl === "string" ? payload.dataUrl : "");
+    })
+    .subscribe((status) => {
+      // Ask an open control app for the current tournament logo.
+      if (status === "SUBSCRIBED") {
+        overlayBannerChannel.send({ type: "broadcast", event: "event-logo-request", payload: {} });
+      }
+    });
 
   _loadMatchEventTypesOnce().then(() => {
     _hydrateStoredMatchLogs();
