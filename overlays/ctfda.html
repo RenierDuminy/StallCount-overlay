@@ -35,7 +35,7 @@
         --ce-tuck: calc(var(--ce-radius) * 2); /* how far call strips sit under the score box */
         position: absolute;
         z-index: 2;
-        top: 32px;
+        top: 54px;
         left: 32px;
         display: flex;
         flex-direction: column;
@@ -59,6 +59,46 @@
         white-space: nowrap;
         box-shadow: 0 6px 16px rgba(0,0,0,0.35);
       }
+
+      /* Match clock tab: same type as the score column (Bebas Neue 38px) */
+      /* Logo + teams (the black part of the box); the clock tab hangs under it, centred */
+      .ce-black {
+        position: relative;
+        display: flex;
+        align-items: stretch;
+      }
+
+      /* Event name tab: hangs above the black part, centred. Out of flow, so
+         .ce-wrap's top is pushed down by its height (~22px) to keep the box in place. */
+      .ce-tab--top {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        margin-left: 0;
+        text-align: center;
+      }
+
+      .ce-tab--clock {
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        margin-left: 0;
+        text-align: center;
+        padding: 2px 22px 0;
+        font-family: "Bebas Neue", sans-serif;
+        font-size: 38px;
+        font-weight: 400;
+        letter-spacing: 0.04em;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .ce-tab--clock.is-hidden { display: none; }
+
+      /* Past the time cap: counting up, in red */
+      .ce-tab--clock.is-overtime { color: #dc2626; }
 
       .ce-main {
         position: relative;
@@ -613,23 +653,28 @@
     <div id="viewport">
       <div id="canvas">
         <div class="ce-wrap">
-          <div class="ce-tab ce-tab--top" id="eventName">Event</div>
-
           <div class="ce-main">
-            <div class="ce-logo">
-              <img id="eventLogo" alt="" />
-              <span class="ce-logo-fallback" id="eventLogoFallback">SC</span>
-            </div>
+            <div class="ce-black">
+              <div class="ce-tab ce-tab--top" id="eventName">Event</div>
 
-            <div class="ce-teams">
-              <div class="ce-team" id="teamABox">
-                <span class="ce-swatch"></span>
-                <span class="ce-team-name" id="teamAName">Team A</span>
+              <div class="ce-logo">
+                <img id="eventLogo" alt="" />
+                <span class="ce-logo-fallback" id="eventLogoFallback">SC</span>
               </div>
-              <div class="ce-team" id="teamBBox">
-                <span class="ce-swatch"></span>
-                <span class="ce-team-name" id="teamBName">Team B</span>
+
+              <div class="ce-teams">
+                <div class="ce-team" id="teamABox">
+                  <span class="ce-swatch"></span>
+                  <span class="ce-team-name" id="teamAName">Team A</span>
+                </div>
+                <div class="ce-team" id="teamBBox">
+                  <span class="ce-swatch"></span>
+                  <span class="ce-team-name" id="teamBName">Team B</span>
+                </div>
               </div>
+
+              <!-- Match clock (replaces the organiser text; parent gets .is-hidden from the engine) -->
+              <div class="ce-tab ce-tab--bottom ce-tab--clock"><span id="matchClock" data-clock-status>--:--</span></div>
             </div>
 
             <div class="ce-scores">
@@ -668,15 +713,12 @@
             </div>
           </div>
 
-          <!-- Organiser text: edit here -->
-          <div class="ce-tab ce-tab--bottom">Cape Town Flying Disc Association</div>
         </div>
 
         <!-- Required stubs (status/clock are not shown in this layout) -->
         <div style="display:none">
           <div id="overlayBar"></div>
           <span id="statusLabel" data-role="status-label">LIVE</span>
-          <span id="matchClock">--:--</span>
         </div>
 
         <!-- Player stats banner -->

@@ -401,10 +401,13 @@ function _getDerivedClockInfo() {
   const elapsedMs = Math.max(0, now - matchStartMs - effectivePausedMs);
   let secondsRemaining = Math.max(0, Math.ceil(timeCapSeconds - elapsedMs / 1000));
   if (hasMatchEnd) secondsRemaining = 0;
+  // Seconds past the time cap (0 until the cap is passed, and frozen once the match has ended)
+  const overtimeSeconds = hasMatchEnd ? 0 : Math.max(0, Math.floor(elapsedMs / 1000 - timeCapSeconds));
 
   return {
     clockText: formatSeconds(secondsRemaining),
     secondsRemaining,
+    overtimeSeconds,
     hasStarted: true,
     isPaused,
   };

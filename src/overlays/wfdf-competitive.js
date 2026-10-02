@@ -12,6 +12,7 @@ import {
   getOverlayPayloadKey,
   isAutoFadeEnabled,
   getCurrentMatch,
+  getOverlayInitialized,
   isStoppageActive,
   getActiveTimeoutTeam,
   isHalftimeActive,
@@ -651,9 +652,34 @@ function updateOverlay(payload) {
       );
     });
   }
-  if (elements.matchClock) elements.matchClock.textContent = matchClock;
+  // Opt-in (data-clock-status on #matchClock): the clock slot also shows match status
+  // (Scheduled / Starting soon / Finished) and turns red and counts up past the time cap.
+  const clockShowsStatus = elements.matchClock?.hasAttribute("data-clock-status");
+  let clockDisplay = matchClock;
+  let clockHidden = hideClock;
+  let clockOvertime = false;
+  if (clockShowsStatus && !(mo?.enabled && mo.clock)) {
+    const isFinished =
+      derivedStatusLabel === "FINAL" || ["finished", "completed", "final"].includes(normalizedStatus);
+    const overtime = clockInfo?.overtimeSeconds || 0;
+    clockHidden = false;
+    if (isFinished) {
+      clockDisplay = "FINISHED";
+    } else if (!clockInfo?.hasStarted) {
+      // Initialised wins; otherwise show the match status (scheduled -> SCHEDULED)
+      clockDisplay = getOverlayInitialized()
+        ? "STARTING SOON"
+        : STATUS_LABELS[normalizedStatus] || (status ? status.toString().toUpperCase() : "SCHEDULED");
+    } else if (overtime > 0) {
+      const mins = Math.floor(overtime / 60);
+      clockDisplay = `${String(mins).padStart(2, "0")}:${String(overtime % 60).padStart(2, "0")}`;
+      clockOvertime = true;
+    }
+  }
+  if (elements.matchClock) elements.matchClock.textContent = clockDisplay;
   if (elements.matchClock?.parentElement) {
-    elements.matchClock.parentElement.classList.toggle("is-hidden", hideClock);
+    elements.matchClock.parentElement.classList.toggle("is-hidden", clockHidden);
+    elements.matchClock.parentElement.classList.toggle("is-overtime", clockOvertime);
   }
   if (elements.overlayBar) elements.overlayBar.classList.toggle("is-clock-hidden", hideClock);
   if (elements.teamAName) elements.teamAName.textContent = teamAName;
